@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Knowledge Graph — my-ai-brain</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
+    #header { padding: 16px 24px; background: #1e293b; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    #header h1 { font-size: 1.2rem; color: #38bdf8; }
+    #search { flex: 1; min-width: 200px; max-width: 400px; padding: 8px 12px; border: 1px solid #475569; border-radius: 8px; background: #0f172a; color: #e2e8f0; font-size: 0.9rem; }
+    #search:focus { outline: none; border-color: #38bdf8; }
+    #stats { font-size: 0.8rem; color: #94a3b8; }
+    #type-filter { padding: 8px 12px; border: 1px solid #475569; border-radius: 8px; background: #0f172a; color: #e2e8f0; font-size: 0.85rem; }
+    #canvas { width: 100%; height: calc(100vh - 64px); }
+    .node { cursor: pointer; }
+    .node circle { stroke: #fff; stroke-width: 1.5px; }
+    .node text { font-size: 11px; fill: #e2e8f0; pointer-events: none; }
+    .link { stroke: #475569; stroke-opacity: 0.6; }
+    .link-label { font-size: 9px; fill: #64748b; }
+    #tooltip { position: absolute; padding: 10px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; font-size: 0.85rem; pointer-events: none; opacity: 0; transition: opacity 0.2s; max-width: 300px; z-index: 100; }
+    #tooltip .name { font-weight: bold; color: #38bdf8; }
+    #tooltip .type { color: #94a3b8; font-size: 0.75rem; }
+    #tooltip .desc { margin-top: 4px; color: #cbd5e1; }
+    #legend { position: fixed; bottom: 16px; left: 16px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px; font-size: 0.75rem; }
+    .legend-item { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+    .legend-color { width: 12px; height: 12px; border-radius: 50%; }
+    #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2rem; color: #38bdf8; }
+    .error { color: #f87171; }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <h1>🧠 Knowledge Graph</h1>
+    <input id="search" type="text" placeholder="Tìm kiếm entity..." />
+    <select id="type-filter">
+      <option value="">Tất cả types</option>
+    </select>
+    <span id="stats"></span>
+  </div>
+  <div id="loading">Đang tải knowledge graph...</div>
+  <svg id="canvas"></svg>
+  <div id="tooltip"></div>
+  <div id="legend"></div>
+
+  <script>
+    const svg = d3.select('#canvas');
+    const width = window.innerWidth;
+    const height = window.innerHeight - 64;
+    svg.attr('width', width).attr('height', height);
+
+    const g = svg.append('g');
+    const zoom = d3.zoom().scaleExtent([0.1, 4]).on('zoom', (e) => g.attr('transform', e.transform));
+    svg.call(zoom);
+
+    let simulation, nodes = [], links = [];
+    const colorMap = {
+      algorithm: '#38bdf8', concept: '#a78bfa', technology: '#34d399',
+      person: '#fbbf24', system: '#f472b6', default: '#94a3b8'
+    };
+
+    async function loadGraph() {
+      try {
+        const res = await fetch('/api/graph/export');
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Failed to load');
+
+        nodes = data.nodes || [];
+        links = data.links || [];
+
+        // Build D3 data
+        const nodeMap = new Map(nodes.map(n => [n.id, n]));
+        const d3links = links.map(l => ({
+          source: l.source,
+          target: l.target,
+          label: l.label,
+          weight: l.weight || 1
+        })).filter(l => nodeMap.has(l.source) && nodeMap.has(l.target));
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('stats').textContent = `${nodes.length} entities, ${d3links.length} relationships`;
+
+        // Populate type filter
+        const types = [...new Set(nodes.map(n => n.group))];
+        const filter = document.getElementById('type-filter');
+        types.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t; opt.textContent = t;
+          filter.appendChild(opt);
+        });
+
+        render(nodes, d3links);
+      } catch (err) {
+        document.getElementById('loading').innerHTML = `<span class="error">Lỗi: ${err.message}</span>`;
+      }
+    }
+
+    function render(nodes, links) {
+      g.selectAll('*').remove();
+
+      simulation = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(80))
+        .force('charge', d3.forceManyBody().strength(-200))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius(30));
+
+      // Links
+      const link = g.append('g').selectAll('line')
+        .data(links).enter().append('line')
+        .attr('class', 'link')
+        .attr('stroke-width', d => Math.sqrt(d.weight || 1));
+
+      // Link labels
+      const linkLabel = g.append('g').selectAll('text')
+        .data(links).enter().append('text')
+        .attr('class', 'link-label')
+        .attr('text-anchor', 'middle')
+        .text(d => d.label || '');
+
+      // Nodes
+      const node = g.append('g').selectAll('.node')
+        .data(nodes).enter().append('g')
+        .attr('class', 'node')
+        .call(d3.drag()
+          .on('start', (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+          .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
+          .on('end', (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
+
+      node.append('circle')
+        .attr('r', d => 6 + Math.min((d.connections || 0) * 2, 14))
+        .attr('fill', d => colorMap[d.group] || colorMap.default);
+
+      node.append('text')
+        .attr('dx', 10).attr('dy', 4)
+        .text(d => d.label.length > 20 ? d.label.slice(0, 18) + '…' : d.label);
+
+      // Tooltip
+      const tooltip = d3.select('#tooltip');
+      node.on('mouseover', (e, d) => {
+        tooltip.style('opacity', 1)
+          .style('left', (e.pageX + 12) + 'px')
+          .style('top', (e.pageY - 10) + 'px')
+          .html(`<div class="name">${d.label}</div><div class="type">${d.group}</div><div class="desc">${d.description || 'No description'}</div>`);
+      }).on('mouseout', () => tooltip.style('opacity', 0));
+
+      simulation.on('tick', () => {
+        link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+        linkLabel.attr('x', d => (d.source.x + d.target.x) / 2)
+                 .attr('y', d => (d.source.y + d.target.y) / 2);
+        node.attr('transform', d => `translate(${d.x},${d.y})`);
+      });
+
+      // Legend
+      const legend = d3.select('#legend');
+      legend.selectAll('*').remove();
+      legend.append('div').style('font-weight', 'bold').style('margin-bottom', '6px').text('Entity Types');
+      for (const [type, color] of Object.entries(colorMap)) {
+        if (type === 'default') continue;
+        if (!nodes.some(n => n.group === type)) continue;
+        const item = legend.append('div').attr('class', 'legend-item');
+        item.append('div').attr('class', 'legend-color').style('background', color);
+        item.append('span').text(type);
+      }
+    }
+
+    // Search
+    document.getElementById('search').addEventListener('input', function () {
+      const q = this.value.toLowerCase();
+      g.selectAll('.node').style('opacity', d => {
+        const match = !q || d.label.toLowerCase().includes(q) || (d.description || '').toLowerCase().includes(q);
+        return match ? 1 : 0.1;
+      });
+      g.selectAll('.link').style('opacity', q ? 0.05 : 0.6);
+    });
+
+    // Type filter
+    document.getElementById('type-filter').addEventListener('change', function () {
+      const type = this.value;
+      g.selectAll('.node').style('opacity', d => !type || d.group === type ? 1 : 0.1);
+      g.selectAll('.link').style('opacity', type ? 0.05 : 0.6);
+    });
+
+    // Resize
+    window.addEventListener('resize', () => {
+      const w = window.innerWidth, h = window.innerHeight - 64;
+      svg.attr('width', w).attr('height', h);
+      simulation.force('center', d3.forceCenter(w / 2, h / 2));
+      simulation.alpha(0.3).restart();
+    });
+
+    loadGraph();
+  </script>
+</body>
+</html>

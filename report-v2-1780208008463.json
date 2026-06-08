@@ -1,0 +1,231 @@
+{
+  "topic": "backend beginner",
+  "timestamp": "2026-05-31T06:13:28.490Z",
+  "mode": "fast-analysis",
+  "repositories": [
+    {
+      "name": "ianshulx/Django-Projects-for-beginners",
+      "stars": 358,
+      "url": "https://github.com/ianshulx/Django-Projects-for-beginners",
+      "status": "analyzed",
+      "score": 7.4,
+      "educationScore": 8,
+      "practicalScore": 7.16,
+      "modernScore": 6,
+      "engineeringScore": 5,
+      "verdict": "Tốt",
+      "highlights": [
+        "Có 358 stars trên GitHub",
+        "Mô tả rõ ràng"
+      ],
+      "concerns": [
+        "Ngôn ngữ: JavaScript",
+        "Fork: 287"
+      ]
+    },
+    {
+      "name": "saineshwar/Frapper",
+      "stars": 158,
+      "url": "https://github.com/saineshwar/Frapper",
+      "status": "analyzed",
+      "score": 6.1,
+      "educationScore": 8,
+      "practicalScore": 3.16,
+      "modernScore": 6,
+      "engineeringScore": 5,
+      "verdict": "Tốt",
+      "highlights": [
+        "Có 158 stars trên GitHub",
+        "Mô tả rõ ràng"
+      ],
+      "concerns": [
+        "Ngôn ngữ: JavaScript",
+        "Fork: 50"
+      ]
+    },
+    {
+      "name": "aman-sinha-dev/Backend-Node-Express-EJS-MongoDB",
+      "stars": 36,
+      "url": "https://github.com/aman-sinha-dev/Backend-Node-Express-EJS-MongoDB",
+      "status": "analyzed",
+      "score": 5.2,
+      "educationScore": 8,
+      "practicalScore": 0.72,
+      "modernScore": 6,
+      "engineeringScore": 5,
+      "verdict": "Bình thường",
+      "highlights": [
+        "Có 36 stars trên GitHub",
+        "Mô tả rõ ràng"
+      ],
+      "concerns": [
+        "Ngôn ngữ: JavaScript",
+        "Fork: 4"
+      ]
+    },
+    {
+      "name": "rajveeerr/100xDevs-Journey",
+      "stars": 26,
+      "url": "https://github.com/rajveeerr/100xDevs-Journey",
+      "status": "analyzed",
+      "score": 5.2,
+      "educationScore": 8,
+      "practicalScore": 0.52,
+      "modernScore": 6,
+      "engineeringScore": 5,
+      "verdict": "Bình thường",
+      "highlights": [
+        "Có 26 stars trên GitHub",
+        "Mô tả rõ ràng"
+      ],
+      "concerns": [
+        "Ngôn ngữ: JavaScript",
+        "Fork: 5"
+      ]
+    },
+    {
+      "name": "aman-sinha-dev/MERN",
+      "stars": 22,
+      "url": "https://github.com/aman-sinha-dev/MERN",
+      "status": "analyzed",
+      "score": 5.1,
+      "educationScore": 8,
+      "practicalScore": 0.44,
+      "modernScore": 6,
+      "engineeringScore": 5,
+      "verdict": "Bình thường",
+      "highlights": [
+        "Có 22 stars trên GitHub",
+        "Mô tả rõ ràng"
+      ],
+      "concerns": [
+        "Ngôn ngữ: JavaScript",
+        "Fork: 5"
+      ]
+    },
+    {
+      "name": "MettaSurendhar/node-express-backend-template-for-beginner",
+      "stars": 16,
+      "url": "https://github.com/MettaSurendhar/node-express-backend-template-for-beginner",
+      "status": "analyzed",
+      "score": 5.1,
+      "educationScore": 8,
+      "practicalScore": 0.32,
+      "modernScore": 6,
+      "engineeringScore": 5,
+      "verdict": "Bình thường",
+      "highlights": [
+        "Có 16 stars trên GitHub",
+        "Mô tả rõ ràng"
+      ],
+      "concerns": [
+        "Ngôn ngữ: JavaScript",
+        "Fork: 4"
+      ]
+    },
+    {
+      "name": "marttp/NodeJS-BE-CrashCourse-2023",
+      "stars": 15,
+      "url": "https://github.com/marttp/NodeJS-BE-CrashCourse-2023",
+      "status": "analyzed",
+      "score": 4.4,
+      "educationScore": 8,
+      "practicalScore": 0.3,
+      "modernScore": 6,
+      "engineeringScore": 5,
+      "verdict": "Bình thường",
+      "highlights": [
+        "Có 15 stars trên GitHub",
+        "Mô tả rõ ràng"
+      ],
+      "concerns": [
+        "Ngôn ngữ: JavaScript",
+        "Fork: 0"
+      ]
+    },
+    {
+      "name": "Showrin/node-api-postgres",
+      "stars": 14,
+      "url": "https://github.com/Showrin/node-api-postgres",
+      "status": "analyzed",
+      "score": 5.1,
+      "educationScore": 8,
+      "practicalScore": 0.28,
+      "modernScore": 6,
+      "engineeringScore": 5,
+      "verdict": "Bình thường",
+      "highlights": [
+        "Có 14 stars trên GitHub",
+        "Mô tả rõ ràng"
+      ],
+      "concerns": [
+        "Ngôn ngữ: JavaScript",
+        "Fork: 3"
+      ]
+    },
+    {
+      "name": "scallops-cloud/nodejs-basic-course",
+      "stars": 14,
+      "url": "https://github.com/scallops-cloud/nodejs-basic-course",
+      "status": "analyzed",
+      "score": 4.4,
+      "educationScore": 8,
+      "practicalScore": 0.28,
+      "modernScore": 6,
+      "engineeringScore": 5,
+      "verdict": "Bình thường",
+      "highlights": [
+        "Có 14 stars trên GitHub",
+        "Mô tả rõ ràng"
+      ],
+      "concerns": [
+        "Ngôn ngữ: JavaScript",
+        "Fork: 32"
+      ]
+    },
+    {
+      "name": "suzuki-kenji0627/express-backend-template-for-beginner",
+      "stars": 10,
+      "url": "https://github.com/suzuki-kenji0627/express-backend-template-for-beginner",
+      "status": "analyzed",
+      "score": 4.4,
+      "educationScore": 8,
+      "practicalScore": 0.2,
+      "modernScore": 6,
+      "engineeringScore": 5,
+      "verdict": "Bình thường",
+      "highlights": [
+        "Có 10 stars trên GitHub",
+        "Mô tả rõ ràng"
+      ],
+      "concerns": [
+        "Ngôn ngữ: JavaScript",
+        "Fork: 0"
+      ]
+    }
+  ],
+  "youtubeChannels": [
+    {
+      "name": "Backend Bytes by Prateek",
+      "channelId": "UCS-3Kt_7xLcd9XyLW2jXsVg",
+      "views": 3436,
+      "subscribers": 28,
+      "videoCount": 41,
+      "url": "https://www.youtube.com/channel/UCS-3Kt_7xLcd9XyLW2jXsVg",
+      "status": "analyzed",
+      "score": 0.3,
+      "educationScore": 6,
+      "consistencyScore": 0.82,
+      "depthScore": 5,
+      "accessibilityScore": 0.0056,
+      "verdict": "Cần cải thiện",
+      "strengths": [
+        "3,436 views",
+        "41 videos"
+      ],
+      "suggestions": [
+        "Kiểm tra chi tiết các video gần đây"
+      ]
+    }
+  ]
+}

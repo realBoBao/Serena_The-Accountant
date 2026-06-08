@@ -1,0 +1,58 @@
+# ═══════════════════════════════════════════════════════════════
+# SANDBOX Dockerfile — Security-Hardened Code Execution Environment
+# ═══════════════════════════════════════════════════════════════
+#
+# Design Principles:
+#   1. Minimal attack surface — only compilers, no network tools
+#   2. Non-root execution — runs as unprivileged user
+#   3. Read-only root filesystem — prevents persistent modification
+#   4. No network access — --network none at runtime
+#   5. Resource limits — CPU, RAM, PIDs, disk I/O capped
+#   6. Ephemeral — container destroyed after each execution
+#
+# Usage:
+#   docker build -t ai-sandbox -f Dockerfile.sandbox .
+#   docker run --rm --network none --memory 256m --cpus 0.5 \
+#     --pids-limit 50 --read-only --tmpfs /tmp:rw,noexec,size=50m \
+#     -v "$(pwd)/code.py":/sandbox/code.py:ro \
+#     ai-sandbox python /sandbox/code.py
+# ═══════════════════════════════════════════════════════════════
+
+FROM debian:bookworm-slim AS base
+
+# ── Install only essential compilers/interpreters ──
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    nodejs \
+    gcc \
+    g++ \
+    openjdk-17-jdk-headless \
+    rustc \
+    golang-go \
+    csharp \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get purge -y --auto-remove \
+    && rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/locale/*
+
+# ── Remove dangerous binaries that could be abused ──
+RUN rm -f /usr/bin/wget /usr/bin/curl /usr/bin/nc /usr/bin/ncat \
+    /usr/bin/ssh /usr/bin/scp /usr/bin/rsync \
+    /usr/bin/apt* /usr/bin/dpkg \
+    2>/dev/null || true
+
+# ── Create non-root sandbox user ──
+RUN groupadd -r sandbox && useradd -r -g sandbox -d /sandbox -s /bin/bash sandbox
+
+# ── Create sandbox working directory ──
+RUN mkdir -p /sandbox && chown sandbox:sandbox /sandbox
+
+# ── Set up seccomp-like restrictions via permissions ──
+# Remove SUID/SGID binaries to prevent privilege escalation
+RUN find / -perm /6000 -type f -exec chmod a-s {} \; 2>/dev/null || true
+
+# ── Switch to non-root user ──
+USER sandbox
+WORKDIR /sandbox
+
+# ── Default: show available compilers ──
+CMD ["echo", "Sandbox ready. Compilers: python3, node, gcc, g++, javac, rustc, go, csharp"]

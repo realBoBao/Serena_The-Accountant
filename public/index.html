@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#6366f1">
+  <meta name="description" content="My AI Brain — Mobile Companion App">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <title>AI Brain — Mobile Companion</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <h1>🧠 AI Brain</h1>
+      <div class="header-actions">
+        <button id="syncBtn" class="btn-icon" title="Đồng bộ">🔄</button>
+        <button id="settingsBtn" class="btn-icon" title="Cài đặt">⚙️</button>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="flashcards">📚 Flashcards</button>
+      <button class="tab" data-tab="ask">❓ Hỏi đáp</button>
+      <button class="tab" data-tab="graph">🕸️ Knowledge</button>
+      <button class="tab" data-tab="stats">📊 Stats</button>
+    </nav>
+
+    <!-- Flashcards Tab -->
+    <section id="flashcards-tab" class="tab-content active">
+      <div class="section-header">
+        <h2>Ôn tập hôm nay</h2>
+        <span id="dueCount" class="badge">0</span>
+      </div>
+      <div id="flashcardList" class="card-list">
+        <div class="empty-state">Đang tải flashcards...</div>
+      </div>
+      <div id="reviewArea" class="review-area hidden">
+        <div class="flashcard" id="flashcard">
+          <div class="flashcard-inner">
+            <div class="flashcard-front">
+              <p id="cardQuestion"></p>
+              <button id="showAnswerBtn" class="btn">Xem đáp án</button>
+            </div>
+            <div class="flashcard-back hidden">
+              <p id="cardAnswer"></p>
+              <div class="review-actions">
+                <button id="wrongBtn" class="btn btn-wrong">❌ Sai</button>
+                <button id="hardBtn" class="btn btn-hard">😐 Khó</button>
+                <button id="correctBtn" class="btn btn-correct">✅ Đúng</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Ask Tab -->
+    <section id="ask-tab" class="tab-content">
+      <div class="ask-container">
+        <div class="ask-input-row">
+          <textarea id="askInput" placeholder="Hỏi bất cứ điều gì..." rows="3"></textarea>
+          <button id="voiceInputBtn" class="btn-icon voice-btn" title="Nói để hỏi">🎤</button>
+        </div>
+        <button id="askBtn" class="btn btn-primary">Hỏi AI 🧠</button>
+        <div id="voiceStatus" class="voice-status hidden">🎤 Đang nghe... Nói xong sẽ tự gửi</div>
+        <div id="askResult" class="ask-result hidden">
+          <div class="answer-box">
+            <div id="answerText"></div>
+            <div id="answerSource" class="source-info"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Knowledge Graph Tab -->
+    <section id="graph-tab" class="tab-content">
+      <div class="section-header">
+        <h2>Knowledge Graph</h2>
+        <button id="graphLoadBtn" class="btn btn-sm">🔄 Tải đồ thị</button>
+      </div>
+      <input type="text" id="graphSearch" placeholder="Tìm kiếm entity..." class="search-input">
+      <div id="graphResults" class="graph-results">
+        <div class="empty-state">Tìm kiếm entities trong knowledge graph...</div>
+      </div>
+      <div id="graphVisualization" class="graph-viz-container">
+        <div id="graphViz"></div>
+      </div>
+      <div id="graphNodeDetail" class="graph-node-detail hidden">
+        <div class="detail-header">
+          <h3 id="detailName"></h3>
+          <span id="detailType" class="badge"></span>
+          <button id="detailClose" class="btn-icon">✕</button>
+        </div>
+        <p id="detailDesc"></p>
+        <div id="detailRelations"></div>
+      </div>
+    </section>
+
+    <!-- Stats Tab -->
+    <section id="stats-tab" class="tab-content">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="statTotalCards">0</div>
+          <div class="stat-label">Tổng flashcards</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statDueCards">0</div>
+          <div class="stat-label">Đến hạn</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statEntities">0</div>
+          <div class="stat-label">Entities</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statRelationships">0</div>
+          <div class="stat-label">Relationships</div>
+        </div>
+      </div>
+      <div class="section-header">
+        <h3>Hiệu suất hệ thống</h3>
+      </div>
+      <div id="evolutionStats" class="evolution-stats">
+        <div class="empty-state">Đang tải thống kê...</div>
+      </div>
+    </section>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="/js/graph_viz.js" type="module"></script>
+  <script src="/js/app.js" type="module"></script>
+</body>
+</html>

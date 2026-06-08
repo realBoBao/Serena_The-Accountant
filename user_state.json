@@ -1,0 +1,83 @@
+{
+  "lastTopic": "test-topic",
+  "history": [
+    {
+      "topic": "tìm source backend",
+      "timestamp": "2026-06-03T05:08:41.039Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-05T07:59:21.274Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-05T09:29:37.363Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-05T09:47:53.968Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-05T10:16:19.575Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-06T18:11:31.659Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-06T18:19:44.650Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-06T20:31:33.115Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-06T22:48:16.062Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-06T23:13:17.790Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-06T23:22:22.879Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-06T23:24:39.134Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-06T23:54:27.268Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-07T00:10:30.275Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-07T04:44:39.832Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-08T01:21:05.815Z"
+    }
+  ],
+  "transitionCounts": {
+    "tìm source backend": {
+      "test-topic": 1
+    },
+    "test-topic": {
+      "test-topic": 14
+    }
+  },
+  "interests": [
+    "test-topic"
+  ],
+  "interestCounts": {
+    "test-topic": 13
+  }
+}

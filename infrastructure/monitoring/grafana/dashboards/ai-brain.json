@@ -1,0 +1,79 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "ai-brain",
+    "title": "AI Brain - System Overview",
+    "tags": ["ai-brain", "discord", "monitoring"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": { "from": "now-6h", "to": "now" },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Uptime",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+        "targets": [
+          { "expr": "service_uptime_seconds{service='ai-brain'}", "legendFormat": "Uptime (s)" }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Discord Messages Processed",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "targets": [
+          { "expr": "rate(discord_messages_total[5m])", "legendFormat": "{{intent}} - {{status}}" }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "RAG Queries by Source",
+        "type": "piechart",
+        "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+        "targets": [
+          { "expr": "sum by(source) (rag_queries_total)", "legendFormat": "{{source}}" }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Memory Usage",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+        "targets": [
+          { "expr": "process_memory_bytes{type='rss'}", "legendFormat": "RSS" },
+          { "expr": "process_memory_bytes{type='heapUsed'}", "legendFormat": "Heap Used" },
+          { "expr": "process_memory_bytes{type='heapTotal'}", "legendFormat": "Heap Total" }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Vector Search Latency (p95)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+        "targets": [
+          { "expr": "histogram_quantile(0.95, rate(vector_search_duration_seconds_bucket[5m]))", "legendFormat": "p95" },
+          { "expr": "histogram_quantile(0.50, rate(vector_search_duration_seconds_bucket[5m]))", "legendFormat": "p50" }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Flashcards Due",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
+        "targets": [
+          { "expr": "flashcards_due", "legendFormat": "Due" }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Sandbox Executions",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+        "targets": [
+          { "expr": "rate(sandbox_executions_total[5m])", "legendFormat": "{{language}} - {{status}}" }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+# my-ai-brain — Project Summary
+
+## Overview
+My AI Brain is a multi-agent AI ecosystem running on Discord, integrating RAG, polyglot code sandbox,
+spaced repetition flashcards, multi-agent debate, Manim animation, and Prometheus/Grafana monitoring.
+
+## Tech Stack
+- Runtime: Node.js 20 (ESM)
+- AI: LangChain + Google Gemini Embeddings + OpenRouter (fallback) + Llama.cpp (local LLM)
+- Database: SQLite (flashcards, vectors) + Qdrant (vector search)
+- Chat: Discord.js v14
+- DevOps: Docker + PM2 + GitHub Actions + Prometheus + Grafana
+
+## Architecture
+- agents/       — Specialized agents (RAG, PDF, Debate, Manim, Interaction)
+- lib/          — Shared libraries (embeddings, chunking, sandbox, flashcards, metrics)
+- tests/        — Jest unit tests (82 tests)
+- monitoring/   — Prometheus/Grafana configs
+- scripts/      — Maintenance scripts (backup, restore, archive)
+
+## Key Commands
+- npm run dev         — Start all services in dev mode
+- npm start           — Start main entry point
+- npm test            — Run Jest tests
+- npm run pipeline    — Run automated learning pipeline
+- pm2 start ecosystem.config.cjs  — Start all production services
+
+## Discord Commands
+- !ask <question>     — RAG-powered Q&A
+- !run <code>         — Execute code in sandbox
+- !quiz               — Start flashcard review
+- !learn <url>        — Ingest document from URL
+- !debate <problem>   — Multi-agent debate
+- !animate <desc>     — Generate Manim animation
+- !memory <text>      — Save to long-term memory
+- !schedule           — Sync schedule/syllabus
+
+## REST API (port 3005)
+- POST /api/notes       — Quick note from iOS Shortcuts
+- POST /api/ask         — Ask question via API
+- GET  /api/flashcards  — Manage flashcards
+- POST /api/sandbox/run — Execute code
+- POST /api/debate      — Trigger debate

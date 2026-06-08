@@ -1,0 +1,87 @@
+{
+  "topic": "Node.js API beginner",
+  "timestamp": "2026-05-31T06:12:21.803Z",
+  "repositories": [
+    {
+      "name": "meseven/node-egitimi-movie-api",
+      "stars": 57,
+      "url": "https://github.com/meseven/node-egitimi-movie-api",
+      "status": "analysis_error",
+      "score": 0,
+      "summary": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [403 Forbidden] Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked. [{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_SERVICE_BLOCKED\",\"domain\":\"googleapis.com\",\"metadata\":{\"methodName\":\"google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent\",\"service\":\"generativelanguage.googleapis.com\",\"consumer\":\"projects/290887525214\",\"apiName\":\"generativelanguage.googleapis.com\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked.\"}]"
+    },
+    {
+      "name": "onlyVishesh/Namaste-Nodejs",
+      "stars": 56,
+      "url": "https://github.com/onlyVishesh/Namaste-Nodejs",
+      "status": "analysis_error",
+      "score": 0,
+      "summary": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [403 Forbidden] Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked. [{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_SERVICE_BLOCKED\",\"domain\":\"googleapis.com\",\"metadata\":{\"methodName\":\"google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent\",\"service\":\"generativelanguage.googleapis.com\",\"consumer\":\"projects/290887525214\",\"apiName\":\"generativelanguage.googleapis.com\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked.\"}]"
+    },
+    {
+      "name": "victoria-lo/TAPI",
+      "stars": 36,
+      "url": "https://github.com/victoria-lo/TAPI",
+      "status": "analysis_error",
+      "score": 0,
+      "summary": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [403 Forbidden] Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked. [{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_SERVICE_BLOCKED\",\"domain\":\"googleapis.com\",\"metadata\":{\"service\":\"generativelanguage.googleapis.com\",\"methodName\":\"google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent\",\"consumer\":\"projects/290887525214\",\"apiName\":\"generativelanguage.googleapis.com\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked.\"}]"
+    },
+    {
+      "name": "HaiderMalik12/build-graphql-apis-with-node.js-and-mongodb",
+      "stars": 22,
+      "url": "https://github.com/HaiderMalik12/build-graphql-apis-with-node.js-and-mongodb",
+      "status": "no_readme",
+      "score": 0,
+      "summary": "Không tìm thấy README.md"
+    },
+    {
+      "name": "ryzokuken/easy-crypto",
+      "stars": 22,
+      "url": "https://github.com/ryzokuken/easy-crypto",
+      "status": "analysis_error",
+      "score": 0,
+      "summary": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [403 Forbidden] Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked. [{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_SERVICE_BLOCKED\",\"domain\":\"googleapis.com\",\"metadata\":{\"service\":\"generativelanguage.googleapis.com\",\"consumer\":\"projects/290887525214\",\"apiName\":\"generativelanguage.googleapis.com\",\"methodName\":\"google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked.\"}]"
+    },
+    {
+      "name": "scallops-cloud/nodejs-basic-course",
+      "stars": 14,
+      "url": "https://github.com/scallops-cloud/nodejs-basic-course",
+      "status": "analysis_error",
+      "score": 0,
+      "summary": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [403 Forbidden] Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked. [{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_SERVICE_BLOCKED\",\"domain\":\"googleapis.com\",\"metadata\":{\"service\":\"generativelanguage.googleapis.com\",\"consumer\":\"projects/290887525214\",\"apiName\":\"generativelanguage.googleapis.com\",\"methodName\":\"google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked.\"}]"
+    },
+    {
+      "name": "songz/OpenTokNodeJS",
+      "stars": 11,
+      "url": "https://github.com/songz/OpenTokNodeJS",
+      "status": "analysis_error",
+      "score": 0,
+      "summary": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [403 Forbidden] Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked. [{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_SERVICE_BLOCKED\",\"domain\":\"googleapis.com\",\"metadata\":{\"service\":\"generativelanguage.googleapis.com\",\"apiName\":\"generativelanguage.googleapis.com\",\"methodName\":\"google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent\",\"consumer\":\"projects/290887525214\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked.\"}]"
+    },
+    {
+      "name": "Shyl0214/Procodrr-Node.js",
+      "stars": 8,
+      "url": "https://github.com/Shyl0214/Procodrr-Node.js",
+      "status": "no_readme",
+      "score": 0,
+      "summary": "Không tìm thấy README.md"
+    },
+    {
+      "name": "codewithdann0/temp-node-tut",
+      "stars": 6,
+      "url": "https://github.com/codewithdann0/temp-node-tut",
+      "status": "analysis_error",
+      "score": 0,
+      "summary": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [403 Forbidden] Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked. [{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_SERVICE_BLOCKED\",\"domain\":\"googleapis.com\",\"metadata\":{\"methodName\":\"google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent\",\"service\":\"generativelanguage.googleapis.com\",\"consumer\":\"projects/290887525214\",\"apiName\":\"generativelanguage.googleapis.com\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked.\"}]"
+    },
+    {
+      "name": "AdhyWiranto44/simple-rest-api",
+      "stars": 5,
+      "url": "https://github.com/AdhyWiranto44/simple-rest-api",
+      "status": "analysis_error",
+      "score": 0,
+      "summary": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [403 Forbidden] Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked. [{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_SERVICE_BLOCKED\",\"domain\":\"googleapis.com\",\"metadata\":{\"consumer\":\"projects/290887525214\",\"methodName\":\"google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent\",\"apiName\":\"generativelanguage.googleapis.com\",\"service\":\"generativelanguage.googleapis.com\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"Requests to this API generativelanguage.googleapis.com method google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent are blocked.\"}]"
+    }
+  ],
+  "youtubeChannels": []
+}

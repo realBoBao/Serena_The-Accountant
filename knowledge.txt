@@ -1,0 +1,3 @@
+Hệ thống RAG (Retrieval-Augmented Generation) là một kiến trúc AI dùng vector database để lưu trữ kiến thức. Khi người dùng gửi câu hỏi, hệ thống sẽ chuyển câu hỏi thành embedding, tìm các đoạn tài liệu liên quan nhất trong database, rồi đưa cả đoạn tài liệu đó vào LLM để tổng hợp câu trả lời.
+
+RAG giúp giảm sai sót và hạn chế tình trạng AI ảo giác vì câu trả lời được dẫn dắt bởi dữ liệu thực tế đã được nạp vào bộ nhớ. Điều này đặc biệt phù hợp khi bạn xây dựng một AI Bách khoa toàn thư cá nhân.

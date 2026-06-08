@@ -1,0 +1,172 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# GitHub Actions Cron Scraper — Chạy pipeline tự động trên Cloud
+# ═══════════════════════════════════════════════════════════════════════════
+# 
+# Lịch chạy: 14:00 & 20:00 giờ PDT (UTC-7, múi giờ Thái Bình Dương)
+#   - 14:00 PDT = 21:00 UTC
+#   - 20:00 PDT = 03:00 UTC (ngày hôm sau)
+#
+# Cách hoạt động:
+#   1. GitHub Actions trigger theo lịch cron (UTC)
+#   2. Checkout code mới nhất từ branch main
+#   3. Setup Node.js 20
+#   4. Cài đặt dependencies
+#   5. Chạy pipeline_report_v2.js với các biến môi trường từ Secrets
+#   6. Tự động gửi Discord webhook notification
+#
+# Cấu hình Secrets trong GitHub:
+#   Settings → Secrets and variables → Actions → New repository secret
+#   Các secrets cần thiết:
+#     - DISCORD_WEBHOOK
+#     - YOUTUBE_API_KEY
+#     - GITHUB_TOKEN
+#     - GOOGLE_API_KEY / GEMINI_API_KEY
+#     - TAVILY_API_KEY
+#     - GOOGLE_SEARCH_API_KEY
+#     - GOOGLE_SEARCH_CX_ID
+#     - DISCORD_BOT_TOKEN
+#     - OPENROUTER_API_KEY
+#
+# Lưu ý: GitHub Actions cron có thể delay 5-15 phút so với lịch chính xác.
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: 🕐 Cron Scraper — Data Pipeline
+
+on:
+  # Trigger theo lịch cron (UTC)
+  # 14:00 VN (UTC+7) = 07:00 UTC
+  # 20:00 VN (UTC+7) = 13:00 UTC
+  schedule:
+    # 14:00 PDT = 21:00 UTC, 20:00 PDT = 03:00 UTC
+    - cron: '0 21,3 * * *'
+
+  # Cho phép chạy thủ công từ GitHub UI
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: 'Chủ đề tìm kiếm (để trống = random)'
+        required: false
+        default: ''
+        type: string
+      force:
+        description: 'Force re-analyzed (true/false)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+# Chỉ cho phép 1 instance chạy tại 1 thời điểm
+concurrency:
+  group: cron-scraper
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ── Job: Chạy Data Pipeline ──
+  scrape:
+    name: 🔍 Search & Scrape Pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 30  # Timeout sau 30 phút
+
+    steps:
+      # ── Bước 1: Checkout code ──
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # ── Bước 2: Setup Node.js ──
+      - name: ⚙️ Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      # ── Bước 3: Cài đặt dependencies ──
+      - name: 📦 Install dependencies
+        run: npm ci --ignore-scripts
+
+      # ── Bước 4: Chuẩn bị thư mục artifacts ──
+      - name: 📁 Create artifacts directory
+        run: mkdir -p artifacts backups
+
+      # ── Bước 5: Chạy Data Pipeline ──
+      - name: 🚀 Run Data Pipeline
+        env:
+          # Discord
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_COMMAND_PREFIX: '!ask'
+
+          # YouTube
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          YOUTUBE_MIN_VIEWS: '50000'
+
+          # GitHub
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_MIN_STARS: '10'
+          GITHUB_CREATED_AFTER: '2020-01-01'
+
+          # Google APIs
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_SEARCH_API_KEY: ${{ secrets.GOOGLE_SEARCH_API_KEY }}
+          GOOGLE_SEARCH_CX_ID: ${{ secrets.GOOGLE_SEARCH_CX_ID }}
+
+          # Tavily
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+
+          # OpenRouter
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL_NAME: 'google/gemini-2.5-flash'
+
+          # Pipeline config
+          PIPELINE_TOPIC: ${{ github.event.inputs.topic || '' }}
+          FORCE_PIPELINE: ${{ github.event.inputs.force || 'false' }}
+          CRON_SCHEDULE: '0 14,20 * * *'
+
+          # Vector DB
+          QDRANT_URL: 'http://localhost:6333'
+
+          # Feature flags
+          GRAPH_ENHANCED_RAG: 'true'
+          AB_TESTING: 'false'
+
+        run: |
+          echo "🕐 Starting pipeline at $(date)"
+          echo "📌 Topic: ${PIPELINE_TOPIC:-random}"
+          echo "🔄 Force: ${FORCE_PIPELINE}"
+          
+          node pipeline_report_v2.js "${PIPELINE_TOPIC}" || true
+          
+          echo "✅ Pipeline completed at $(date)"
+
+      # ── Bước 6: Upload artifacts (backup) ──
+      - name: 📤 Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-artifacts-${{ github.run_id }}
+          path: artifacts/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # ── Job: Thông báo kết quả ──
+  notify:
+    name: 📢 Notify Result
+    needs: scrape
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: 📊 Report status
+        run: |
+          if [ "${{ needs.scrape.result }}" == "success" ]; then
+            echo "✅ Pipeline completed successfully!"
+          else
+            echo "❌ Pipeline failed!"
+          fi
