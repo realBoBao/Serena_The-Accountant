@@ -158,45 +158,168 @@ async function checkCatchUp() {
   const lastEvo = lastRuns.evo ? new Date(lastRuns.evo) : null;
   const lastGraph = lastRuns.graph ? new Date(lastRuns.graph) : null;
 
-  const hoursSince = (date) => date ? (now - date) / 3600000 : Infinity;
+  const hoursSince = (date) => {
+    if (!date) return null; // null = chưa bao giờ chạy
+    const hours = (now - new Date(date).getTime()) / 3600000;
+    return hours > 0 ? hours : 0;
+  };
+
+  const formatHours = (h) => h === null ? 'never' : `${h.toFixed(1)}h ago`;
 
   console.log('[scheduler] Catch-up check:');
-  console.log(`  Pipeline: last run ${lastPipeline ? hoursSince(lastPipeline).toFixed(1) + 'h ago' : 'never'}`);
-  console.log(`  Memory:   last run ${lastMemory ? hoursSince(lastMemory).toFixed(1) + 'h ago' : 'never'}`);
-  console.log(`  Backup:   last run ${lastBackup ? hoursSince(lastBackup).toFixed(1) + 'h ago' : 'never'}`);
+  console.log(`  Pipeline: last run ${formatHours(hoursSince(lastPipeline))}`);
+  console.log(`  Memory:   last run ${formatHours(hoursSince(lastMemory))}`);
+  console.log(`  Backup:   last run ${formatHours(hoursSince(lastBackup))}`);
 
-  // Pipeline catch-up: nếu quá 12h chưa chạy → chạy bù
-  if (hoursSince(lastPipeline) > 12) {
+  // ── Chạy catch-up cho từng job bị lỡ, lưu kết quả thực tế ──
+  const catchUpResults = {}; // { jobName: { output: string, error?: string } }
+  const missedJobs = [];
+
+  // Pipeline catch-up (nếu chưa bao giờ chạy → coi như missed)
+  const hsPipeline = hoursSince(lastPipeline);
+  if (hsPipeline === null || hsPipeline > 12) {
     console.log('[scheduler] ⚠️ Pipeline missed! Running catch-up...');
-    runPipeline();
+    try {
+      // Chạy pipeline và lấy output (timeout 10 phút)
+      const { execSync } = await import('child_process');
+      const output = execSync(`node pipeline_report_v2.js`, {
+        encoding: 'utf8',
+        timeout: 600000,
+        maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+      });
+      // Lấy phần summary từ output (từ dòng "Pipeline completed" trở về trước)
+      const lines = output.split('\n');
+      const summaryStart = lines.findIndex(l => l.includes('Pipeline completed') || l.includes('Markdown report saved'));
+      const summary = summaryStart >= 0 ? lines.slice(Math.max(0, summaryStart - 20)).join('\n') : output.slice(-3000);
+      catchUpResults.Pipeline = { output: summary };
+      missedJobs.push({ name: 'Pipeline', hours: hsPipeline || 0 });
+      console.log('[scheduler] Pipeline catch-up completed, output length:', summary.length);
+    } catch (err) {
+      catchUpResults.Pipeline = { error: err.message };
+      missedJobs.push({ name: 'Pipeline', hours: hsPipeline || 0 });
+      console.error('[scheduler] Pipeline catch-up failed:', err.message);
+    }
   }
 
-  // Memory consolidation catch-up: nếu quá 24h chưa chạy → chạy bù
-  if (hoursSince(lastMemory) > 24) {
+  // Memory consolidation catch-up (nếu chưa bao giờ chạy → coi như missed)
+  const hsMemory = hoursSince(lastMemory);
+  if (hsMemory === null || hsMemory > 24) {
     console.log('[scheduler] ⚠️ Memory consolidation missed! Running catch-up...');
-    runMemoryConsolidation();
+    try {
+      const result = await runMemoryConsolidation();
+      catchUpResults.Memory = { output: `Memory consolidation completed. Archived memories.` };
+      missedJobs.push({ name: 'Memory', hours: hsMemory });
+    } catch (err) {
+      catchUpResults.Memory = { error: err.message };
+      missedJobs.push({ name: 'Memory', hours: hsMemory });
+    }
   }
 
-  // Backup catch-up: nếu quá 7 ngày chưa chạy (chủ nhật) → chạy bù
-  if (hoursSince(lastBackup) > 168) {
+  // Backup catch-up (nếu chưa bao giờ chạy → coi như missed)
+  const hsBackup = hoursSince(lastBackup);
+  if (hsBackup === null || hsBackup > 168) {
     console.log('[scheduler] ⚠️ Backup missed! Running catch-up...');
-    runBackup();
+    try {
+      const result = await runBackup();
+      catchUpResults.Backup = { output: `Backup completed successfully.` };
+      missedJobs.push({ name: 'Backup', hours: hsBackup });
+    } catch (err) {
+      catchUpResults.Backup = { error: err.message };
+      missedJobs.push({ name: 'Backup', hours: hsBackup });
+    }
   }
 
-  // EvoAgent catch-up: nếu quá 24h chưa chạy → chạy bù
-  if (hoursSince(lastEvo) > 24) {
+  // EvoAgent catch-up (nếu chưa bao giờ chạy → coi như missed)
+  const hsEvo = hoursSince(lastEvo);
+  if (hsEvo === null || hsEvo > 24) {
     console.log('[scheduler] ⚠️ EvoAgent missed! Running catch-up...');
     try {
       await addJob(QueueName.EVOLUTION, JobType.AUTO_EVALUATE, { timestamp: Date.now() }, { priority: 3 });
-    } catch { /* ignore */ }
+      catchUpResults.EvoAgent = { output: 'EvoAgent auto-evaluate job queued.' };
+      missedJobs.push({ name: 'EvoAgent', hours: hsEvo });
+    } catch (err) {
+      catchUpResults.EvoAgent = { error: err.message };
+      missedJobs.push({ name: 'EvoAgent', hours: hsEvo });
+    }
   }
 
-  // GraphAgent catch-up: nếu quá 7 ngày chưa chạy → chạy bù
-  if (hoursSince(lastGraph) > 168) {
+  // GraphAgent catch-up (nếu chưa bao giờ chạy → coi như missed)
+  const hsGraph = hoursSince(lastGraph);
+  if (hsGraph === null || hsGraph > 168) {
     console.log('[scheduler] ⚠️ GraphAgent missed! Running catch-up...');
     try {
       await addJob(QueueName.GRAPH, JobType.SYNC_GRAPH, { timestamp: Date.now() }, { priority: 5 });
+      catchUpResults.GraphAgent = { output: 'GraphAgent sync job queued.' };
+      missedJobs.push({ name: 'GraphAgent', hours: hsGraph });
+    } catch (err) {
+      catchUpResults.GraphAgent = { error: err.message };
+      missedJobs.push({ name: 'GraphAgent', hours: hsGraph });
+    }
+  }
+
+  // ── Gửi Discord notification với kết quả thực tế ──
+  if (missedJobs.length > 0) {
+    const catchUpKey = `catchup_notified_${new Date().toISOString().slice(0, 10)}`;
+    if (!global[catchUpKey]) {
+      console.log(`[scheduler] 📢 Sending catch-up notification for: ${missedJobs.map(j => j.name).join(', ')}`);
+      await _sendCatchUpNotification(missedJobs, catchUpResults);
+      global[catchUpKey] = true;
+    } else {
+      console.log('[scheduler] Catch-up notification already sent today, skipping');
+    }
+  }
+}
+
+/**
+ * Gửi Discord webhook notification khi catch-up chạy
+ */
+async function _sendCatchUpNotification(missedJobs, catchUpResults) {
+  // Đọc webhook URL từ .env file trực tiếp (child process không có process.env)
+  let webhookUrl = process.env.DISCORD_WEBHOOK;
+  if (!webhookUrl) {
+    try {
+      const fs = await import('fs');
+      const envContent = fs.readFileSync('.env', 'utf8');
+      const match = envContent.match(/DISCORD_WEBHOOK="([^"]+)"/);
+      webhookUrl = match ? match[1] : null;
     } catch { /* ignore */ }
+  }
+  if (!webhookUrl) return; // Không có webhook → skip
+
+  // Build fields: mỗi job hiện thời gian lỡ + kết quả thực tế (nếu có)
+  const fields = missedJobs.map(job => {
+    const result = catchUpResults[job.name];
+    const hoursStr = job.hours === null || job.hours === undefined ? 'never' : `${Number(job.hours).toFixed(1)}h`;
+    let value = `Lỡ: ${hoursStr}`;
+    if (result?.output) {
+      // Có kết quả thực tế → hiển thị output (giới hạn 1024 ký tự cho Discord field)
+      const output = String(result.output).slice(0, 1000);
+      value += `\n\`\`\`${output}${result.output.length > 1000 ? '...' : ''}\`\`\``;
+    } else if (result?.error) {
+      value += `\n❌ Lỗi: ${result.error}`;
+    } else {
+      value += `\n✅ Đã chạy bù`;
+    }
+    return { name: `⚠️ ${job.name}`, value, inline: false };
+  });
+
+  const embed = {
+    title: '🔄 Scheduler Catch-Up',
+    description: `Máy vừa reboot/sleep. Đã chạy bù **${missedJobs.length}** job bị lỡ:`,
+    fields,
+    timestamp: new Date().toISOString(),
+    color: 0xffaa00,
+  };
+
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ embeds: [embed] }),
+    });
+    console.log('[scheduler] Catch-up notification sent to Discord');
+  } catch (err) {
+    console.error('[scheduler] Failed to send catch-up notification:', err.message);
   }
 }
 

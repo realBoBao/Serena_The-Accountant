@@ -129,8 +129,12 @@ async function runBackup() {
   return { backupName, backupPath, results, totalSize };
 }
 
+// Export for scheduler import
+export { runBackup };
+
 // Run if called directly
-runBackup()
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runBackup()
   .then(r => {
     console.log(`\n✅ Backup saved to: ${r.backupPath}`);
     process.exit(0);

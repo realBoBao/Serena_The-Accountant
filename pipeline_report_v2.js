@@ -733,7 +733,7 @@ async function run(topic = null, isForce = false){
     const analysis = await fetchRepoReadmeAndAnalyze(owner, name, r.stargazers_count);
     allAnalyzedRepos.push({ name: r.full_name, stars: r.stargazers_count, url: r.html_url, summary: analysis.summary, category: analysis.category });
     await markProcessed({ id, type: 'repo', url: r.html_url, hash: String(r.stargazers_count) });
-    const score = calculateSourceScore({ type: 'repo', stars: r.stargazers_count, relevanceConfidence: repoGate.confidence, isRelevant: repoGate.isRelevant });
+    const score = calculateSourceScore({ type: 'repo', stars: r.stargazers_count, relevanceConfidence: repoGate?.confidence || 'medium', isRelevant: repoGate?.isRelevant !== false });
     const highValue = isHighValueStudy(score);
     if (highValue) console.log(`[HIGH VALUE] Repo ${r.full_name} — score: ${score.toFixed(2)}`);
     await addMemory({
