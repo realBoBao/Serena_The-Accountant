@@ -257,6 +257,30 @@ async function checkCatchUp() {
     }
   }
 
+  // WebhookBot catch-up: kiểm tra xem service có đang chạy không
+  try {
+    const webhookHealth = await fetch('http://localhost:3007/health', { signal: AbortSignal.timeout(5000) });
+    if (!webhookHealth.ok) {
+      console.log('[scheduler] ⚠️ WebhookBot not healthy, restarting...');
+      // Restart webhook bot via PM2
+      const { execSync } = await import('child_process');
+      execSync('pm2 restart AI_WebhookBot', { encoding: 'utf8' });
+      catchUpResults.WebhookBot = { output: 'WebhookBot restarted via PM2' };
+      missedJobs.push({ name: 'WebhookBot', hours: 0 });
+    }
+  } catch (err) {
+    console.log('[scheduler] ⚠️ WebhookBot not running, starting...');
+    try {
+      const { execSync } = await import('child_process');
+      execSync('pm2 start ecosystem.config.cjs --only AI_WebhookBot', { encoding: 'utf8' });
+      catchUpResults.WebhookBot = { output: 'WebhookBot started via PM2' };
+      missedJobs.push({ name: 'WebhookBot', hours: 0 });
+    } catch (startErr) {
+      catchUpResults.WebhookBot = { error: startErr.message };
+      missedJobs.push({ name: 'WebhookBot', hours: 0 });
+    }
+  }
+
   // ── Gửi Discord notification với kết quả thực tế ──
   if (missedJobs.length > 0) {
     const catchUpKey = `catchup_notified_${new Date().toISOString().slice(0, 10)}`;

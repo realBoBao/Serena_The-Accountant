@@ -22,6 +22,20 @@
 module.exports = {
   apps: [
     {
+      name: "AI_WebhookBot",
+      script: "./webhook_bot.js",
+      instances: 1,
+      exec_mode: "fork",
+      watch: false,
+      max_memory_restart: "200M",
+      env: {
+        NODE_ENV: "production",
+        WEBHOOK_BOT_PORT: "3007",
+        DISCORD_WEBHOOK: "https://discord.com/api/webhooks/1510728361385791718/0tEYWDB1s-sYYUH543p0fLcd7A4FF8aJ5lUXNMjcwmA7B-P7lR3zn-FJGy5OrTEWH3fm",
+        WEBHOOK_SECRET: "B70DDC6EA58A6AD9458ABBBC9405D6D6CDD570E92543204C41876269D36D0E9F",
+      }
+    },
+    {
       name: "AI_Brain",
       script: "./gateway.js",
       instances: 1,
