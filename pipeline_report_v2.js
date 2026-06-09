@@ -1156,9 +1156,10 @@ function generateMarkdownReport({ topic, repos, videos, stackoverflow, hackernew
 
   if (repos.length > 0) {
     md += `## 🏆 TOP GITHUB REPOSITORIES ĐƯỢC ĐÁNH GIÁ\n\n`;
-    const goodRepos = repos.filter(r => r.score >= 6);
-    const okRepos = repos.filter(r => r.score >= 4 && r.score < 6);
-    const weakRepos = repos.filter(r => r.score < 4);
+    // Score range: 0-1 (from calculateSourceScore)
+    const goodRepos = repos.filter(r => r.score >= 0.7);
+    const okRepos = repos.filter(r => r.score >= 0.4 && r.score < 0.7);
+    const weakRepos = repos.filter(r => r.score < 0.4);
 
     if (goodRepos.length > 0) {
       md += `### 🟢 Nguồn Tài Liệu Tốt (Đáng tham khảo nhất)\n\n`;
