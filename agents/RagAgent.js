@@ -519,9 +519,57 @@ async function webScout(query) {
     return true;
   });
 
+  // ── Diversification: Loại source đã dùng gần đây để tránh trùng lặp ──
+  // Lấy danh sách source IDs đã dùng trong 24h qua từ embedding cache
+  const recentSourceKeys = getRecentSourceKeys();
+  if (recentSourceKeys.size > 0) {
+    const before = deduped.length;
+    // Giữ lại source mới, ưu tiên source chưa dùng gần đây
+    const fresh = deduped.filter(r => {
+      const key = (r.url || r.title || '').toLowerCase().slice(0, 50);
+      return !recentSourceKeys.has(key);
+    });
+    // Nếu có source mới → dùng source mới, không thì dùng tất cả
+    if (fresh.length > 0) {
+      logger.info(`[WebScout] Diversification: ${fresh.length}/${before} fresh sources (excluded ${before - fresh.length} recent)`);
+      // Lưu source keys hiện tại cho lần sau
+      deduped.forEach(r => addRecentSourceKey((r.url || r.title || '').toLowerCase().slice(0, 50)));
+      return fresh.slice(0, webSearchLimit);
+    }
+  } else {
+    // Lần đầu → lưu source keys
+    deduped.forEach(r => addRecentSourceKey((r.url || r.title || '').toLowerCase().slice(0, 50)));
+  }
+
   logger.info(`[WebScout] Total: ${deduped.length} results (YouTube + GitHub + Hybrid)`);
   return deduped.slice(0, webSearchLimit);
 }
+
+// ─── Recent Source Keys (Diversification) ──────────────────
+// Lưu source keys đã dùng gần đây để tránh trùng lặp khi query giống nhau
+const recentSourceMap = new Map(); // key → timestamp
+
+function getRecentSourceKeys() {
+  const cutoff = Date.now() - 4 * 3600 * 1000; // 4 giờ
+  const keys = new Set();
+  for (const [key, ts] of recentSourceMap) {
+    if (ts > cutoff) keys.add(key);
+    else recentSourceMap.delete(key); // Cleanup old entries
+  }
+  return keys;
+}
+
+function addRecentSourceKey(key) {
+  recentSourceMap.set(key, Date.now());
+  // Giới hạn max 500 entries
+  if (recentSourceMap.size > 500) {
+    const oldest = recentSourceMap.keys().next().value;
+    recentSourceMap.delete(oldest);
+  }
+}
+
+// Export for testing
+export { getRecentSourceKeys, addRecentSourceKey };
 
 // ─── YouTube Search ────────────────────────────────────────
 async function searchYouTube(query) {
