@@ -118,15 +118,21 @@ export async function restoreBackup(backupFile) {
     : tempDir;
 
   // Read manifest
+  let manifest = {};
   try {
     const manifestRaw = await readFile(path.join(backupDir, 'manifest.json'), 'utf8');
     if (!manifestRaw || manifestRaw.trim().length === 0) {
       throw new Error('Empty manifest file');
     }
-    const manifest = JSON.parse(manifestRaw);
+    // Defensive: check if JSON is complete (starts with { and ends with })
+    const trimmed = manifestRaw.trim();
+    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+      throw new Error('Incomplete JSON (file may be corrupted)');
+    }
+    manifest = JSON.parse(trimmed);
     console.log(`[Restore] Backup from: ${manifest.timestamp}`);
   } catch (err) {
-    console.log(`[Restore] ⚠️  Manifest error: ${err.message}, proceeding anyway`);
+    console.log(`[Restore] ⚠️  Manifest error: ${err.message}, proceeding with defaults`);
   }
 
   // Restore database files

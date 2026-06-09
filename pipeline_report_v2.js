@@ -234,26 +234,28 @@ function heuristicRelevance(title, description){
     'cloud computing', 'web development', 'deploy', 'infrastructure','coding insterview',
     'system design', 'distributed systems', 'scalability', 'performance optimization', 
     'load balancing', 'caching strategies', 'cloud architecture', 'software architecture', 
-    'multithreading', 'concurrency', 'memory management', 'data structures', 'algorithm analysis'
+    'multithreading', 'concurrency', 'memory management', 'data structures', 'algorithm analysis',
+    'network bottleneck', 'networking', 'tcp', 'http', 'protocol', 'server', 'latency',
+    'throughput', 'bandwidth', 'firewall', 'load balancer', 'reverse proxy', 'cdn'
   ];
 
   if(strongNegative.some((term) => text.includes(term))){
     if(!strongPositive.some((term) => text.includes(term))){
-      return { isRelevant: false, confidence: 'high', reason: 'Non-technical content detected' };
+      return { isRelevant: false, confidence: 'high', reason: 'Non-technical content detected', score: 0.2 };
     }
   }
   
   if(strongPositive.some((term) => text.includes(term))){
-    return { isRelevant: true, confidence: 'medium', reason: 'Technical content confirmed' };
+    return { isRelevant: true, confidence: 'medium', reason: 'Technical content confirmed', score: 0.7 };
   }
 
   const weakPositive = ['system', 'design', 'architecture', 'learning', 'tutorial', 'course', 'engineering'];
   const weakCount = weakPositive.filter((term) => text.includes(term)).length;
   if(weakCount >= 2){
-    return { isRelevant: true, confidence: 'low', reason: 'Technical keywords detected' };
+    return { isRelevant: true, confidence: 'low', reason: 'Technical keywords detected', score: 0.5 };
   }
 
-  return { isRelevant: false, confidence: 'medium', reason: 'Insufficient technical indicators' };
+  return { isRelevant: false, confidence: 'medium', reason: 'Insufficient technical indicators', score: 0.3 };
 }
 
 async function preCheckRelevance(title, description){
@@ -319,10 +321,22 @@ Evaluate if this is legitimate software engineering content or misleading/non-te
       return heuristicRelevance(title, description);
     }
     const parsed = JSON.parse(match[0]);
+    // Normalize confidence: LLM có thể trả về number (0-100) hoặc string ('high'/'medium'/'low')
+    let confidenceStr = 'medium';
+    if (typeof parsed.confidence === 'number') {
+      confidenceStr = parsed.confidence >= 70 ? 'high' : parsed.confidence >= 40 ? 'medium' : 'low';
+    } else if (typeof parsed.confidence === 'string') {
+      confidenceStr = parsed.confidence;
+    }
+    // Normalize score: đảm bảo luôn có giá trị mặc định
+    const score = (typeof parsed.score === 'number' && !isNaN(parsed.score))
+      ? Math.max(0, Math.min(1, parsed.score))
+      : (parsed.isRelevant ? 0.6 : 0.2);
     return {
       isRelevant: Boolean(parsed.isRelevant),
-      confidence: Number(parsed.confidence || 0),
+      confidence: confidenceStr,
       reason: String(parsed.reason || 'No reason provided'),
+      score,
     };
   }catch(e){
     console.warn('[preCheckRelevance] LLM request failed, falling back to heuristic');
@@ -1023,17 +1037,39 @@ async function run(topic = null, isForce = false){
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // SINGLE AGGREGATED WEBHOOK — Gửi tất cả sources trong 1 embed
+  // SINGLE AGGREGATED WEBHOOK — Luôn gửi, dù có source hay không
   // ═══════════════════════════════════════════════════════════════
-  if (process.env.DISCORD_WEBHOOK && allResults.length > 0) {
+  if (process.env.DISCORD_WEBHOOK) {
     try {
       const { sendAggregatedWebhook } = await import('./notify_discord.js');
-      await sendAggregatedWebhook({
-        topic: chosenTopic,
-        results: allResults,
-        bullets: `${allResults.length} sources found across YouTube, GitHub, StackOverflow, HackerNews, arXiv, Facebook`,
-      });
-      console.log(`[Webhook] ✓ Sent aggregated embed with ${allResults.length} sources`);
+
+      if (allResults.length > 0) {
+        // Có source → gửi thông báo source bình thường
+        await sendAggregatedWebhook({
+          topic: chosenTopic,
+          results: allResults,
+          bullets: `${allResults.length} sources found across YouTube, GitHub, StackOverflow, HackerNews, arXiv, Facebook`,
+        });
+        console.log(`[Webhook] ✓ Sent aggregated embed with ${allResults.length} sources`);
+      } else {
+        // Không có source → gửi thông báo server status (để biết pipeline đã chạy)
+        const errorSources = [];
+        if (repos.length === 0) errorSources.push('GitHub');
+        if (videos.length === 0) errorSources.push('YouTube');
+        if (reddits.length === 0) errorSources.push('Reddit');
+        if (stackoverflow.length === 0) errorSources.push('StackOverflow');
+        if (hackerNews.length === 0) errorSources.push('HackerNews');
+        if (papers.length === 0) errorSources.push('arXiv');
+
+        await sendAggregatedWebhook({
+          topic: chosenTopic,
+          results: [],
+          bullets: '',
+          isError: true,
+          errorMessage: `No sources found. Failed sources: ${errorSources.join(', ')}`,
+        });
+        console.log(`[Webhook] ⚠️ Sent error notification — no sources found`);
+      }
     } catch (err) {
       console.error('[Webhook] ✗ Aggregated webhook failed:', err?.message || err);
     }

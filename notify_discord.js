@@ -117,13 +117,28 @@ function getSourceLabel(type) {
  * @param {Array}  options.results — Mảng tất cả sources [{title, url, type, category, score, ...}]
  * @param {string} [options.bullets] — Summary bullets (optional)
  */
-export async function sendAggregatedWebhook({ topic, results, bullets }) {
+export async function sendAggregatedWebhook({ topic, results, bullets, isError = false, errorMessage = '' }) {
   const webhook = process.env.DISCORD_WEBHOOK;
   if (!webhook) throw new Error('DISCORD_WEBHOOK not set');
   if (!isHttpUrl(webhook)) throw new Error('DISCORD_WEBHOOK must be a valid http(s) URL');
 
+  // ── Nếu không có source → gửi thông báo server status ──
   if (!results || results.length === 0) {
-    console.log('[Webhook] No results to send');
+    if (isError) {
+      // Gửi thông báo lỗi server
+      const payload = {
+        embeds: [{
+          title: '⚠️ Pipeline Error',
+          description: `Pipeline chạy nhưng không tìm được source nào.\n\n**Topic:** ${topic}\n**Error:** ${errorMessage || 'Unknown error'}`,
+          color: 0xff6600,
+          timestamp: new Date().toISOString(),
+        }],
+      };
+      await fetch(webhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      console.log('[Webhook] Sent error notification (no sources found)');
+    } else {
+      console.log('[Webhook] No results to send');
+    }
     return false;
   }
 
