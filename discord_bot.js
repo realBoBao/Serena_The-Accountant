@@ -1389,6 +1389,58 @@ client.on(Events.MessageCreate, async (message) => {
       }
     }
 
+    // ── !preferences command: Set user learning preferences ──
+    if (message.content.startsWith('!preferences')) {
+      const { setUserPreference, getUserPreference } = await import('./lib/cross_model_learner.js');
+      const args = message.content.slice(12).trim().split(/\s+/);
+      const subCommand = args[0] || 'show';
+      const userId = message.author.id;
+
+      if (subCommand === 'show') {
+        const prefs = getUserPreference(userId);
+        return message.reply({
+          content: `⚙️ **Tuỳ chọn của bạn:**\n` +
+            `- Model ưu tiên: **${prefs.preferredModel}**\n` +
+            `- Sources ưu tiên: **${(prefs.preferredSources || []).join(', ') || 'không có'}**\n` +
+            `- Tự học: **${prefs.learningEnabled ? 'BẬT' : 'TẮT'}**\n\n` +
+            `**Cách dùng:**\n` +
+            `\`!preferences model openrouter|gemini|auto\`\n` +
+            `\`!preferences sources youtube,github,stackoverflow\`\n` +
+            `\`!preferences learning on|off\``,
+          allowedMentions: { parse: [], repliedUser: false },
+        });
+      }
+
+      if (subCommand === 'model') {
+        const model = args[1];
+        if (!['openrouter', 'gemini', 'auto'].includes(model)) {
+          return message.reply({ content: '❌ Model phải là: openrouter, gemini, hoặc auto', allowedMentions: { parse: [], repliedUser: false } });
+        }
+        setUserPreference(userId, { preferredModel: model });
+        return message.reply({ content: `✅ Đã set model ưu tiên: **${model}**`, allowedMentions: { parse: [], repliedUser: false } });
+      }
+
+      if (subCommand === 'sources') {
+        const sources = args.slice(1).join(' ').split(',').map(s => s.trim()).filter(Boolean);
+        if (sources.length === 0) {
+          return message.reply({ content: '❌ Ví dụ: `!preferences sources youtube,github`', allowedMentions: { parse: [], repliedUser: false } });
+        }
+        setUserPreference(userId, { preferredSources: sources });
+        return message.reply({ content: `✅ Đã set sources ưu tiên: **${sources.join(', ')}**`, allowedMentions: { parse: [], repliedUser: false } });
+      }
+
+      if (subCommand === 'learning') {
+        const enabled = args[1] === 'on';
+        setUserPreference(userId, { learningEnabled: enabled });
+        return message.reply({ content: `✅ Đã ${enabled ? 'BẬT' : 'TẮT'} chế độ tự học`, allowedMentions: { parse: [], repliedUser: false } });
+      }
+
+      return message.reply({
+        content: '❌ Lệnh không hợp lệ. Dùng: `!preferences show|model|sources|learning`',
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    }
+
     // ── !answer command: Review flashcard ──
     if (message.content.startsWith('!answer ')) {
       const { reviewFlashcard } = await import('./lib/flashcard_db.js');

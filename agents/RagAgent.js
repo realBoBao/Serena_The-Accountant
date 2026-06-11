@@ -13,6 +13,15 @@ import { searchBm25 } from '../lib/bm25_search.js';
 import { recordModelCall, selectOptimalModel } from '../lib/self_evolution.js';
 import { enhanceWithGraph, buildGraphAugmentedPrompt } from '../lib/graph_rag.js';
 import { startSpan, endSpan, generateTraceId } from '../lib/tracing.js';
+import {
+  compareResponses,
+  learnFromResponse,
+  improvePromptWithLearning,
+  updateSourcePreference,
+  getSourcePreferences,
+  setUserPreference,
+  getUserPreference,
+} from '../lib/cross_model_learner.js';
 // Lazy imports for optional features (loaded on demand to reduce startup memory)
 let _bandit = null;
 let _pagerank = null;
@@ -591,6 +600,45 @@ function isSimilarQuery(a, b) {
   return intersection.size / union.size > 0.8;
 }
 
+// ─── User Source Tracking (File-based) ─────────────────────
+// Lưu sources đã hiển thị cho user để tránh trùng lặp
+// Persist vào file để survive PM2 restarts
+const USER_SOURCES_FILE = path.join(process.cwd(), '.user_sources.json');
+
+async function getSeenSources(userId) {
+  try {
+    if (fs.existsSync(USER_SOURCES_FILE)) {
+      const data = JSON.parse(fs.readFileSync(USER_SOURCES_FILE, 'utf8'));
+      const cutoff = Date.now() - 24 * 3600 * 1000; // 24 giờ
+      const seen = new Set();
+      const userData = data[userId] || {};
+      for (const [sid, ts] of Object.entries(userData)) {
+        if (ts > cutoff) seen.add(sid);
+      }
+      return seen;
+    }
+  } catch { /* ignore */ }
+  return new Set();
+}
+
+async function markSourceSeen(userId, sourceId) {
+  try {
+    let data = {};
+    if (fs.existsSync(USER_SOURCES_FILE)) {
+      data = JSON.parse(fs.readFileSync(USER_SOURCES_FILE, 'utf8'));
+    }
+    if (!data[userId]) data[userId] = {};
+    data[userId][sourceId] = Date.now();
+    // Giới hạn max 500 sources per user
+    const keys = Object.keys(data[userId]);
+    if (keys.length > 500) {
+      const oldest = keys.sort((a, b) => data[userId][a] - data[userId][b])[0];
+      delete data[userId][oldest];
+    }
+    fs.writeFileSync(USER_SOURCES_FILE, JSON.stringify(data), 'utf8');
+  } catch { /* ignore */ }
+}
+
 // ─── YouTube Search ────────────────────────────────────────
 async function searchYouTube(query) {
   if (!YOUTUBE_API_KEY) {
@@ -721,7 +769,7 @@ async function searchGitHub(query) {
   }
 }
 
-async function synthesizeAnswer(query, context, sourceType) {
+async function synthesizeAnswer(query, context, sourceType, userId = null) {
   // Build source quality summary for the LLM
   let sourceInfo = '';
   if (sourceType === 'web') {
@@ -735,9 +783,18 @@ async function synthesizeAnswer(query, context, sourceType) {
     sourceInfo += '\n- Web: Độ tin cậy thấp nhất (generic, cần cross-check)';
   }
 
+  // ── User Profile Context ──
+  let profileContext = '';
+  if (userId) {
+    try {
+      const { userProfileManager } = await import('../lib/user_profile.js');
+      profileContext = userProfileManager.buildSystemContext(userId);
+    } catch { /* profile optional */ }
+  }
+
   const prompt = sourceType === 'web'
-    ? `Local data is missing. Use the following Web Context to answer in natural Vietnamese with Vietnamese diacritics. If URLs are available, cite them at the end.${sourceInfo}\n\n⚠️ QUAN TRỌNG: Ưu tiên thông tin từ nguồn đáng tin cậy nhất (YouTube > GitHub > Facebook > Web). Nếu các nguồn mâu thuẫn, dùng nguồn có độ tin cậy cao hơn.\n\nWeb Context:\n${context}\n\nQuestion: ${query}\n\nAnswer:`
-    : `Use the system Context below to answer the question in natural Vietnamese with Vietnamese diacritics. If the context is not enough, clearly say that you could not find suitable data and suggest how to search or rephrase.\n\nContext:\n${context}\n\nQuestion: ${query}\n\nAnswer:`;
+    ? `Local data is missing. Use the following Web Context to answer in natural Vietnamese with Vietnamese diacritics. If URLs are available, cite them at the end.${sourceInfo}\n\n⚠️ QUAN TRỌNG: Ưu tiên thông tin từ nguồn đáng tin cậy nhất (YouTube > GitHub > Facebook > Web). Nếu các nguồn mâu thuẫn, dùng nguồn có độ tin cậy cao hơn.${profileContext ? '\n\n' + profileContext : ''}\n\nWeb Context:\n${context}\n\nQuestion: ${query}\n\nAnswer:`
+    : `Use the system Context below to answer the question in natural Vietnamese with Vietnamese diacritics. If the context is not enough, clearly say that you could not find suitable data and suggest how to search or rephrase.${profileContext ? '\n\n' + profileContext : ''}\n\nContext:\n${context}\n\nQuestion: ${query}\n\nAnswer:`;
 
   try {
     return await invokeLlm([new HumanMessage(systemInstruction), new HumanMessage(prompt)], 'LLM');
@@ -860,6 +917,11 @@ export async function answerQuestion(query, options = {}) {
       });
 
       if (gate.pass) {
+        // ── Cross-Model Learning: học từ response tốt ──
+        if (options.userId && getUserPreference(options.userId).learningEnabled) {
+          learnFromResponse(cleanQuery, answer, 'local', localResults).catch(() => {});
+          updateSourcePreference(predictedTopic, 'local', gate.pass ? 0.8 : 0.3);
+        }
         return { answer, source: 'local', results: localResults, predictedTopic, sourcesFormatted: formatSourcesWithScore(localResults, 'local') };
       }
 
@@ -932,11 +994,33 @@ export async function answerQuestion(query, options = {}) {
         source: 'web',
       });
 
-      if (gate.pass) return { answer, source: 'web', results: webResults, predictedTopic, sourcesFormatted: formatSourcesWithScore(webResults, 'web') };
+      // ── Source Deduplication: Loại source đã hiển thị cho user ──
+      const userId = options.userId || 'anonymous';
+      const seenSources = await getSeenSources(userId);
+      const freshWebResults = webResults.filter(r => {
+        const sid = (r.url || r.title || '').toLowerCase().slice(0, 60);
+        return !seenSources.has(sid);
+      });
+      // Lưu sources hiện tại cho lần sau
+      for (const r of webResults) {
+        const sid = (r.url || r.title || '').toLowerCase().slice(0, 60);
+        await markSourceSeen(userId, sid);
+      }
+      // Nếu có source mới → dùng source mới, không thì dùng tất cả
+      const finalResults = freshWebResults.length > 0 ? freshWebResults : webResults;
 
-      const fallbackSnippet = formatRetrievedSnippets(webResults);
+      if (gate.pass) {
+        // ── Cross-Model Learning: học từ response tốt ──
+        if (options.userId && getUserPreference(options.userId).learningEnabled) {
+          learnFromResponse(cleanQuery, answer, 'web', finalResults).catch(() => {});
+          updateSourcePreference(predictedTopic, 'web', gate.pass ? 0.8 : 0.3);
+        }
+        return { answer, source: 'web', results: finalResults, predictedTopic, sourcesFormatted: formatSourcesWithScore(finalResults, 'web') };
+      }
+
+      const fallbackSnippet = formatRetrievedSnippets(finalResults);
       const safe = gate.safeAnswer || `Toi khong dam bao cau tra loi nay hoan toan dung vi du lieu hien co chua du. Duoi day la cac mảnh thong tin de ban doi chieu:\n\n${fallbackSnippet}`;
-      return { answer: safe, source: 'web', results: webResults, predictedTopic, sourcesFormatted: formatSourcesWithScore(webResults, 'web') };
+      return { answer: safe, source: 'web', results: finalResults, predictedTopic, sourcesFormatted: formatSourcesWithScore(finalResults, 'web') };
     }
   } catch (err) {
     logger.warn('Web synthesize failed:', err?.message || String(err));
