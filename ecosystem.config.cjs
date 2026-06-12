@@ -9,6 +9,7 @@
  *   AI_GraphAgent     — Knowledge graph agent (BullMQ worker)
  *   AI_PlannerWorker  — OODA task planner (BullMQ worker)
  *   AI_AgentWorker    — Agent job processor (BullMQ cluster, 2 instances)
+ *   AI_Scheduler      — Cron job scheduler (pipeline, backup, memory consolidation)
  *
  * ⚠️ SECURITY: All API keys are loaded from .env file via dotenv.
  *    NEVER hardcode keys in this file.
@@ -116,6 +117,19 @@ module.exports = {
         OPENROUTER_API_KEY: "",
         OPENROUTER_BASE_URL: "https://openrouter.ai/api/v1",
         LLM_MODEL: "openrouter/auto",
+      },
+    },
+    {
+      name: "AI_Scheduler",
+      script: "./scheduler.js",
+      instances: 1,
+      exec_mode: "fork",
+      watch: false,
+      max_memory_restart: "300M",
+      env: {
+        NODE_ENV: "production",
+        REDIS_HOST: "127.0.0.1",
+        REDIS_PORT: "6379",
       },
     },
   ],
