@@ -15,9 +15,12 @@ import {
   extractDomainTag,
   calculateSourceScore,
   isHighValueStudy,
-  embedChunksSafe,
+  embedChunksSafe as _embedChunksSafe,
   preCheckRelevanceWithLLM,
 } from './lib/source_analyzer.js';
+
+// Bind embed functions for embedChunksSafe
+const embedChunksSafe = (chunks) => _embedChunksSafe(chunks, embedTextsBatch, embedText);
 
 const execp = promisify(exec);
 const GITHUB_SEARCH_URL = 'https://api.github.com/search/repositories';
