@@ -87,7 +87,7 @@ module.exports = {
     },
     {
       name: "AI_PlannerWorker",
-      script: "./agents/PlannerWorker.js",
+      script: "./agents/PlannerAgent.js",
       instances: 1,
       exec_mode: "fork",
       watch: false,
@@ -104,9 +104,9 @@ module.exports = {
     },
     {
       name: "AI_AgentWorker",
-      script: "./agents/AgentWorker.js",
-      instances: 2,
-      exec_mode: "cluster",
+      script: "./agents/RouterAgent.js",
+      instances: 1,
+      exec_mode: "fork",
       watch: false,
       max_memory_restart: "300M",
       env: {
