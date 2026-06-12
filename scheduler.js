@@ -97,23 +97,23 @@ async function runPipeline() {
   console.log(`[scheduler] Starting pipeline at ${new Date().toISOString()}`);
   console.log('[scheduler] Command:', 'node', args.join(' '));
 
-  // Đánh dấu pipeline đang chạy
-  await saveLastRun('pipeline', 'running');
-
   const child = spawn('node', args, { stdio: 'inherit' });
 
   child.on('exit', async (code, signal) => {
     if (signal) {
       console.log(`[scheduler] Pipeline process terminated with signal ${signal}`);
-      await saveLastRun('pipeline', 'failed');
+      // Ghi timestamp SAU khi xong — tránh catch-up chạy lại
+      await saveLastRun('pipeline');
     } else {
       console.log(`[scheduler] Pipeline process exited with code ${code}`);
-      await saveLastRun('pipeline', code === 0 ? 'done' : 'failed');
+      // Ghi timestamp SAU khi xong — dù success hay fail
+      await saveLastRun('pipeline');
     }
   });
 
   child.on('error', (err) => {
     console.error('[scheduler] Failed to start pipeline process:', err.message || err);
+    // KHÔNG ghi timestamp nếu fail để catch-up có thể retry
   });
 }
 
@@ -442,22 +442,19 @@ if (RUN_ON_START) {
 
 const task = cron.schedule(CRON_SCHEDULE, () => {
   console.log('[scheduler] Cron triggered at', new Date().toISOString());
-  runPipeline();
-  saveLastRun('pipeline').catch(() => {});
+  runPipeline(); // runPipeline tự ghi saveLastRun khi xong
 });
 
 // Memory consolidation: 2:00 AM mỗi ngày
 const memoryTask = cron.schedule(MEMORY_CRON, () => {
   console.log('[scheduler] Memory consolidation triggered at', new Date().toISOString());
-  runMemoryConsolidation();
-  saveLastRun('memory').catch(() => {});
+  runMemoryConsolidation(); // runMemoryConsolidation tự ghi saveLastRun khi xong
 });
 
 // Disaster Recovery: 3:00 AM Chủ Nhật hàng tuần
 const backupTask = cron.schedule(BACKUP_CRON, () => {
   console.log('[scheduler] Backup triggered at', new Date().toISOString());
-  runBackup();
-  saveLastRun('backup').catch(() => {});
+  runBackup(); // runBackup tự ghi saveLastRun khi xong
 });
 
 // ── Proactive Suggestion: 8:00 AM mỗi ngày — Gợi ý học tập chủ động ──
