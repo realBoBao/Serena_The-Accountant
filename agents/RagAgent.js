@@ -735,7 +735,39 @@ async function searchGitHub(query) {
         return [];
       }
       if (res.status === 422) {
-        logger.warn('[WebScout] GitHub: Query rejected (422) — possibly invalid search syntax');
+        // Retry với simplified query (bỏ special characters)
+        logger.warn('[WebScout] GitHub: Query rejected (422) — retrying with simplified query');
+        try {
+          const simpleQuery = encodeURIComponent(query.replace(/[^a-zA-Z0-9\s]/g, '').trim());
+          const retryUrl = `https://api.github.com/search/repositories?q=${simpleQuery}&sort=stars&order=desc&per_page=${webSearchLimit}`;
+          const retryRes = await fetch(retryUrl, {
+            headers: {
+              'Authorization': `token ${GITHUB_TOKEN}`,
+              'Accept': 'application/vnd.github.v3+json',
+              'User-Agent': 'my-ai-brain',
+            },
+          });
+          if (retryRes.ok) {
+            const data = await retryRes.json();
+            logger.info(`[WebScout] GitHub: Retry succeeded — ${(data?.items || []).length} results`);
+            return (data?.items || []).map(repo => {
+              const stars = repo.stargazers_count || 0;
+              const forks = repo.forks_count || 0;
+              const score = Math.min(1, (Math.log10(stars + 1) * 15 + Math.log10(forks + 1) * 8) / 100);
+              return {
+                title: `[GitHub] ${repo.full_name} ⭐${stars.toLocaleString()}`,
+                description: `${repo.description || 'No description'}\nLanguage: ${repo.language || 'N/A'} | Forks: ${forks.toLocaleString()} | Updated: ${repo.updated_at?.slice(0, 10)}`,
+                url: repo.html_url,
+                source: 'github',
+                score,
+                stars,
+                forks,
+              };
+            });
+          }
+        } catch (retryErr) {
+          logger.warn('[WebScout] GitHub: Retry also failed:', retryErr.message);
+        }
         return [];
       }
       logger.warn(`[WebScout] GitHub: HTTP ${res.status} — ${res.statusText}`);
