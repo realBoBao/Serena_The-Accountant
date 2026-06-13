@@ -575,6 +575,59 @@ const nightlyTask = cron.schedule(NIGHTLY_CRON, async () => {
   timezone: 'America/Los_Angeles',
 });
 
+// ── Webhook Source Push: 8:00 AM & 8:00 PM — Gửi sources mới đến Discord ──
+const WEBHOOK_PUSH_CRON = '0 8,20 * * *';
+const webhookPushTask = cron.schedule(WEBHOOK_PUSH_CRON, async () => {
+  console.log('[scheduler] Webhook source push triggered at', new Date().toISOString());
+  try {
+    // Gọi nightly scraper để lấy sources mới
+    const { runNightlyScraper } = await import('./scripts/nightly_scraper.js');
+    const result = await runNightlyScraper();
+
+    // Gửi qua webhook bot
+    const webhookUrl = `http://localhost:${process.env.WEBHOOK_BOT_PORT || 3007}/webhook/pipeline`;
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: result.stored > 0 ? 'success' : 'partial',
+        topic: 'Nightly Source Push',
+        results: {
+          arxiv: result.breakdown?.arxiv || 0,
+          stackoverflow: result.breakdown?.stackoverflow || 0,
+          hackernews: result.breakdown?.hackernews || 0,
+          github: result.breakdown?.github || 0,
+          reddit: result.breakdown?.reddit || 0,
+          youtube: result.breakdown?.youtube || 0,
+          total: result.stored,
+        },
+        duration: result.duration,
+      }),
+    });
+
+    // Gửi alert về sources mới
+    if (result.stored > 0) {
+      const alertUrl = `http://localhost:${process.env.WEBHOOK_BOT_PORT || 3007}/webhook/alert`;
+      await fetch(alertUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          severity: 'info',
+          title: '📚 New Sources Ingested',
+          message: `Nightly scraper stored **${result.stored}** new documents from ${Object.entries(result.breakdown || {}).filter(([, v]) => v > 0).map(([k, v]) => `${k}: ${v}`).join(', ')}.`,
+          source: 'nightly_scraper',
+        }),
+      });
+    }
+
+    console.log(`[scheduler] Webhook push done: ${result.stored} sources sent`);
+  } catch (err) {
+    console.error('[scheduler] Webhook push error:', err?.message || err);
+  }
+}, {
+  timezone: 'America/Los_Angeles',
+});
+
 task.start();
 memoryTask.start();
 backupTask.start();
