@@ -220,6 +220,10 @@
     {
       "topic": "test-topic",
       "timestamp": "2026-06-13T05:44:30.994Z"
+    },
+    {
+      "topic": "test-topic",
+      "timestamp": "2026-06-13T06:20:17.099Z"
     }
   ],
   "transitionCounts": {
@@ -227,7 +231,7 @@
       "test-topic": 1
     },
     "test-topic": {
-      "test-topic": 53
+      "test-topic": 54
     }
   },
   "interests": [

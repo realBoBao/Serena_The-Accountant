@@ -60,15 +60,23 @@ async function runMemoryConsolidation() {
       const combinedText = items.map(i => i.content).join('\n').slice(0, 4000);
       const docId = `${collectionName}:${new Date().toISOString().slice(0, 10)}`;
       
-      const embedding = await embedText(combinedText);
-      await upsertFn(docId, {
-        url: 'scheduler://consolidation',
-        project: collectionName,
-        category: 'Memory',
-        type: 'consolidated',
-      }, [combinedText], [embedding]);
-      
-      console.log(`[scheduler] Consolidated ${items.length} items to ${collectionName}`);
+      try {
+        const embedding = await embedText(combinedText);
+        if (!embedding || !embedding.length) {
+          console.warn(`[scheduler] Embedding failed for ${collectionName}, skipping`);
+          return;
+        }
+        await upsertFn(docId, {
+          url: 'scheduler://consolidation',
+          project: collectionName,
+          category: 'Memory',
+          type: 'consolidated',
+        }, [combinedText], [embedding]);
+        
+        console.log(`[scheduler] Consolidated ${items.length} items to ${collectionName}`);
+      } catch (err) {
+        console.error(`[scheduler] Consolidation error for ${collectionName}:`, err?.message || err);
+      }
     };
 
     // Process each collection independently — one failure doesn't block others
