@@ -249,6 +249,8 @@ async function classifyIntentAsync(text) {
   if (lower.startsWith('!whenwas ')) return 'WHENWAS';
   if (lower.startsWith('!logs ')) return 'LOGS';
   if (lower.startsWith('!memory ') || lower.startsWith('!mem ')) return 'MEMORY';
+  if (lower.startsWith('!prefer ')) return 'PREFER';
+  if (lower.startsWith('!preferences')) return 'PREFERENCES';
   if (lower.startsWith('!ask ')) return 'RAG';
 
   // 2. Semantic routing (Cosine Similarity)
@@ -293,6 +295,8 @@ function classifyIntent(text) {
   if (lower.startsWith('!profile')) return 'PROFILE';
   if (lower.startsWith('!logs ')) return 'LOGS';
   if (lower.startsWith('!memory ') || lower.startsWith('!mem ')) return 'MEMORY';
+  if (lower.startsWith('!prefer ')) return 'PREFER';
+  if (lower.startsWith('!preferences')) return 'PREFERENCES';
   if (lower.startsWith('!ask ')) return 'RAG';
   for (const [intent, keywords] of Object.entries(INTENT_KEYWORDS)) {
     for (const kw of keywords) {

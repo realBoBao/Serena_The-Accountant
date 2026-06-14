@@ -5,6 +5,30 @@
 
 ---
 
+## ✅ ĐÃ HOÀN THÀNH (15 items)
+
+| # | Tên | Tier |
+|---|-----|------|
+| 1 | Hybrid Search (BM25+Vector RRF) | 1 |
+| 2 | LRU + 2-tier Semantic Cache | 1 |
+| 3 | OWASP Security Headers + Validation | 1 |
+| 4 | SQLite WAL Mode (4 DBs) | 1 |
+| 5 | Deep Health Check | 1 |
+| 6 | Sliding Window Rate Limiting | 2 |
+| 7 | DB Pool utility | 2 |
+| 8 | Enhanced Structured Logging | 2 |
+| 9 | Compression Middleware | 3 |
+| 10 | CORS Strict Mode | 3 |
+| 11 | Graceful Shutdown + DB close | 3 |
+| 12 | Qdrant Vector DB Adapter | 4 |
+| 13 | PostgreSQL Migration Helper | 4 |
+| 14 | Cloud Scheduler Setup Script | 4 |
+| 15 | Scheduler Cloud Run awareness | 4 |
+
+**Tests: 6 suites, 68 tests passed ✅**
+
+---
+
 ## 🔴 TIER 1 — HIGH Impact, LOW Effort (làm ngay)
 
 ### 1. Hybrid Search: BM25 + Vector (RRF fusion)

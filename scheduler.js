@@ -1,6 +1,14 @@
 import { spawn } from 'child_process';
 import cron from 'node-cron';
 import { addJob, JobType, QueueName } from './lib/task_queue.js';
+import { getLogger } from './lib/logger.js';
+
+const logger = getLogger('Scheduler');
+
+// ── Cloud Run detection ──────────────────────────────────────────────────────
+// Trên Cloud Run, KHÔNG dùng node-cron (process bị scale-to-zero).
+// Thay vào đó, dùng Google Cloud Scheduler → HTTP POST → /scheduler/:job
+const IS_CLOUD_RUN = !!process.env.K_SERVICE; // Cloud Run sets K_SERVICE env var
 
 // Cron schedule theo PDT (UTC-7)
 // 8AM=15:00UTC, 11AM=18:00UTC, 2PM=21:00UTC, 5PM=00:00UTC, 8PM=03:00UTC
@@ -9,6 +17,12 @@ const CRON_SCHEDULE = process.env.CRON_SCHEDULE || '0 8,11,14,17,20 * * *';
 const RUN_ON_START = process.env.RUN_ON_START !== 'false';
 const FORCE_RUN = process.env.FORCE_PIPELINE === 'true';
 const TOPIC_OVERRIDE = process.env.PIPELINE_TOPIC || '';
+
+if (IS_CLOUD_RUN) {
+  logger.info('[Scheduler] Running on Cloud Run — node-cron disabled, using Cloud Scheduler');
+} else {
+  logger.info('[Scheduler] Running on local/server — using node-cron with PDT timezone');
+}
 
 // ── Memory Consolidation: 2:00 AM mỗi ngày ──
 // Tóm tắt lịch sử chat Discord hôm qua → nhúng vector → lưu vào long-term memory
@@ -457,28 +471,35 @@ if (RUN_ON_START) {
   }, 30000);
 }
 
-const task = cron.schedule(CRON_SCHEDULE, () => {
-  console.log('[scheduler] Cron triggered at', new Date().toISOString());
-  runPipeline(); // runPipeline tự ghi saveLastRun khi xong
-}, {
-  timezone: 'America/Los_Angeles', // PDT — tự động adjust DST
-});
+// ── Only schedule cron jobs when NOT on Cloud Run ──
+// On Cloud Run, use Google Cloud Scheduler → HTTP POST → /scheduler/:job
+let task, memoryTask, backupTask, suggestionTask, evoTask, graphTask, pipelineTask, nightlyTask, webhookPushTask;
 
-// Memory consolidation: 2:00 AM mỗi ngày
-const memoryTask = cron.schedule(MEMORY_CRON, () => {
-  console.log('[scheduler] Memory consolidation triggered at', new Date().toISOString());
-  runMemoryConsolidation(); // runMemoryConsolidation tự ghi saveLastRun khi xong
-});
+if (!IS_CLOUD_RUN) {
+  logger.info('[Scheduler] Registering node-cron jobs (local/server mode)');
 
-// Disaster Recovery: 3:00 AM Chủ Nhật hàng tuần
-const backupTask = cron.schedule(BACKUP_CRON, () => {
-  console.log('[scheduler] Backup triggered at', new Date().toISOString());
-  runBackup(); // runBackup tự ghi saveLastRun khi xong
-});
+  task = cron.schedule(CRON_SCHEDULE, () => {
+    logger.info('[scheduler] Cron triggered');
+    runPipeline();
+  }, {
+    timezone: 'America/Los_Angeles',
+  });
 
-// ── Proactive Suggestion: 8:00 AM mỗi ngày — Gợi ý học tập chủ động ──
-const SUGGESTION_CRON = '0 8 * * *';
-const suggestionTask = cron.schedule(SUGGESTION_CRON, async () => {
+  // Memory consolidation: 2:00 AM mỗi ngày
+  memoryTask = cron.schedule(MEMORY_CRON, () => {
+    logger.info('[scheduler] Memory consolidation triggered');
+    runMemoryConsolidation();
+  });
+
+  // Disaster Recovery: 3:00 AM Chủ Nhật hàng tuần
+  backupTask = cron.schedule(BACKUP_CRON, () => {
+    logger.info('[scheduler] Backup triggered');
+    runBackup();
+  });
+
+  // ── Proactive Suggestion: 8:00 AM mỗi ngày ──
+  const SUGGESTION_CRON = '0 8 * * *';
+  suggestionTask = cron.schedule(SUGGESTION_CRON, async () => {
   console.log('[scheduler] Proactive suggestion triggered at', new Date().toISOString());
   try {
     const { runContextMonitor } = await import('./agents/SuggestionAgent.js');
@@ -500,142 +521,118 @@ const suggestionTask = cron.schedule(SUGGESTION_CRON, async () => {
 });
 
 // ── EvoAgent: 4:00 AM mỗi ngày — Phân tích logs & tối ưu hệ thống ──
-const EVO_CRON = '0 4 * * *';
-const evoTask = cron.schedule(EVO_CRON, async () => {
-  console.log('[scheduler] EvoAgent analysis triggered at', new Date().toISOString());
-  try {
-    await addJob(QueueName.EVOLUTION, JobType.AUTO_EVALUATE, {
-      timestamp: Date.now(),
-    }, { priority: 3 });
-
-    // Trigger knowledge gap detection monthly
-    const today = new Date();
-    if (today.getDate() === 1) {
-      await addJob(QueueName.EVOLUTION, JobType.KNOWLEDGE_GAP_DETECTION, {
-        timestamp: Date.now(),
-      }, { priority: 3 });
+  const EVO_CRON = '0 4 * * *';
+  evoTask = cron.schedule(EVO_CRON, async () => {
+    logger.info('[scheduler] EvoAgent analysis triggered');
+    try {
+      await addJob(QueueName.EVOLUTION, JobType.AUTO_EVALUATE, { timestamp: Date.now() }, { priority: 3 });
+      const today = new Date();
+      if (today.getDate() === 1) {
+        await addJob(QueueName.EVOLUTION, JobType.KNOWLEDGE_GAP_DETECTION, { timestamp: Date.now() }, { priority: 3 });
+      }
+      await saveLastRun('evo');
+    } catch (err) {
+      logger.errorObj('[scheduler] EvoAgent error', err);
     }
-    await saveLastRun('evo');
-  } catch (err) {
-    console.error('[scheduler] EvoAgent error:', err?.message || err);
-  }
-});
-
-// ── GraphAgent: 5:00 AM Chủ Nhật — Đồng bộ Knowledge Graph ──
-const GRAPH_CRON = '0 5 * * 0';
-const graphTask = cron.schedule(GRAPH_CRON, async () => {
-  console.log('[scheduler] GraphAgent sync triggered at', new Date().toISOString());
-  try {
-    await addJob(QueueName.GRAPH, JobType.SYNC_GRAPH, {
-      timestamp: Date.now(),
-    }, { priority: 5 });
-
-    // Repair broken connections monthly
-    const today = new Date();
-    if (today.getDate() === 1) {
-      await addJob(QueueName.GRAPH, JobType.REPAIR_GRAPH_CONNECTIONS, {
-        timestamp: Date.now(),
-      }, { priority: 4 });
-    }
-    await saveLastRun('graph');
-  } catch (err) {
-    console.error('[scheduler] GraphAgent error:', err?.message || err);
-  }
-});
-
-// ── Data Pipeline: 14:00 & 20:00 mỗi ngày — Search & Scrape tài liệu ──
-// Dùng timezone America/Los_Angeles (PDT/PST) — tự động adjust DST
-const PIPELINE_CRON = '0 14,20 * * *';
-const pipelineTask = cron.schedule(PIPELINE_CRON, () => {
-  console.log('[scheduler] Pipeline triggered at', new Date().toISOString());
-  // Chạy pipeline trong background process để không block scheduler
-  const child = spawn('node', ['pipeline_report_v2.js'], {
-    stdio: 'inherit',
-    detached: true,
   });
-  child.unref();
-  console.log(`[scheduler] Pipeline spawned with PID ${child.pid}`);
-}, {
-  timezone: 'America/Los_Angeles', // PDT (UTC-7) / PST (UTC-8) — tự động adjust DST
-});
 
-// ── Nightly Scraper: 2:00 AM mỗi ngày — Tự động cào dữ liệu ──
-const NIGHTLY_CRON = '0 2 * * *';
-const nightlyTask = cron.schedule(NIGHTLY_CRON, async () => {
-  console.log('[scheduler] Nightly scraper triggered at', new Date().toISOString());
-  try {
-    const { runNightlyScraper } = await import('./scripts/nightly_scraper.js');
-    const result = await runNightlyScraper();
-    console.log(`[scheduler] Nightly scraper done: ${result.stored} docs stored`);
-    await saveLastRun('nightly');
-  } catch (err) {
-    console.error('[scheduler] Nightly scraper error:', err?.message || err);
-  }
-}, {
-  timezone: 'America/Los_Angeles',
-});
+  // ── GraphAgent: 5:00 AM Chủ Nhật — Đồng bộ Knowledge Graph ──
+  const GRAPH_CRON = '0 5 * * 0';
+  graphTask = cron.schedule(GRAPH_CRON, async () => {
+    logger.info('[scheduler] GraphAgent sync triggered');
+    try {
+      await addJob(QueueName.GRAPH, JobType.SYNC_GRAPH, { timestamp: Date.now() }, { priority: 5 });
+      const today = new Date();
+      if (today.getDate() === 1) {
+        await addJob(QueueName.GRAPH, JobType.REPAIR_GRAPH_CONNECTIONS, { timestamp: Date.now() }, { priority: 4 });
+      }
+      await saveLastRun('graph');
+    } catch (err) {
+      logger.errorObj('[scheduler] GraphAgent error', err);
+    }
+  });
 
-// ── Webhook Source Push: 8:00 AM & 8:00 PM — Gửi sources mới đến Discord ──
-const WEBHOOK_PUSH_CRON = '0 8,20 * * *';
-const webhookPushTask = cron.schedule(WEBHOOK_PUSH_CRON, async () => {
-  console.log('[scheduler] Webhook source push triggered at', new Date().toISOString());
-  try {
-    // Gọi nightly scraper để lấy sources mới
-    const { runNightlyScraper } = await import('./scripts/nightly_scraper.js');
-    const result = await runNightlyScraper();
+  // ── Data Pipeline: 14:00 & 20:00 mỗi ngày ──
+  const PIPELINE_CRON = '0 14,20 * * *';
+  pipelineTask = cron.schedule(PIPELINE_CRON, () => {
+    logger.info('[scheduler] Pipeline triggered');
+    const child = spawn('node', ['pipeline_report_v2.js'], { stdio: 'inherit', detached: true });
+    child.unref();
+    logger.info(`[scheduler] Pipeline spawned PID ${child.pid}`);
+  }, { timezone: 'America/Los_Angeles' });
 
-    // Gửi qua webhook bot
-    const webhookUrl = `http://localhost:${process.env.WEBHOOK_BOT_PORT || 3007}/webhook/pipeline`;
-    await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        status: result.stored > 0 ? 'success' : 'partial',
-        topic: 'Nightly Source Push',
-        results: {
-          arxiv: result.breakdown?.arxiv || 0,
-          stackoverflow: result.breakdown?.stackoverflow || 0,
-          hackernews: result.breakdown?.hackernews || 0,
-          github: result.breakdown?.github || 0,
-          reddit: result.breakdown?.reddit || 0,
-          youtube: result.breakdown?.youtube || 0,
-          total: result.stored,
-        },
-        duration: result.duration,
-      }),
-    });
+  // ── Nightly Scraper: 2:00 AM mỗi ngày ──
+  const NIGHTLY_CRON = '0 2 * * *';
+  nightlyTask = cron.schedule(NIGHTLY_CRON, async () => {
+    logger.info('[scheduler] Nightly scraper triggered');
+    try {
+      const { runNightlyScraper } = await import('./scripts/nightly_scraper.js');
+      const result = await runNightlyScraper();
+      logger.info(`[scheduler] Nightly scraper done: ${result.stored} docs stored`);
+      await saveLastRun('nightly');
+    } catch (err) {
+      logger.errorObj('[scheduler] Nightly scraper error', err);
+    }
+  }, { timezone: 'America/Los_Angeles' });
 
-    // Gửi alert về sources mới
-    if (result.stored > 0) {
-      const alertUrl = `http://localhost:${process.env.WEBHOOK_BOT_PORT || 3007}/webhook/alert`;
-      await fetch(alertUrl, {
+  // ── Webhook Source Push: 8:00 AM & 8:00 PM ──
+  const WEBHOOK_PUSH_CRON = '0 8,20 * * *';
+  webhookPushTask = cron.schedule(WEBHOOK_PUSH_CRON, async () => {
+    logger.info('[scheduler] Webhook source push triggered');
+    try {
+      const { runNightlyScraper } = await import('./scripts/nightly_scraper.js');
+      const result = await runNightlyScraper();
+      const webhookUrl = `http://localhost:${process.env.WEBHOOK_BOT_PORT || 3007}/webhook/pipeline`;
+      await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          severity: 'info',
-          title: '📚 New Sources Ingested',
-          message: `Nightly scraper stored **${result.stored}** new documents from ${Object.entries(result.breakdown || {}).filter(([, v]) => v > 0).map(([k, v]) => `${k}: ${v}`).join(', ')}.`,
-          source: 'nightly_scraper',
+          status: result.stored > 0 ? 'success' : 'partial',
+          topic: 'Nightly Source Push',
+          results: {
+            arxiv: result.breakdown?.arxiv || 0,
+            stackoverflow: result.breakdown?.stackoverflow || 0,
+            hackernews: result.breakdown?.hackernews || 0,
+            github: result.breakdown?.github || 0,
+            reddit: result.breakdown?.reddit || 0,
+            youtube: result.breakdown?.youtube || 0,
+            total: result.stored,
+          },
+          duration: result.duration,
         }),
       });
+      if (result.stored > 0) {
+        const alertUrl = `http://localhost:${process.env.WEBHOOK_BOT_PORT || 3007}/webhook/alert`;
+        await fetch(alertUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            severity: 'info',
+            title: '📚 New Sources Ingested',
+            message: `Nightly scraper stored **${result.stored}** new documents.`,
+            source: 'nightly_scraper',
+          }),
+        });
+      }
+      logger.info(`[scheduler] Webhook push done: ${result.stored} sources sent`);
+    } catch (err) {
+      logger.errorObj('[scheduler] Webhook push error', err);
     }
+  }, { timezone: 'America/Los_Angeles' });
 
-    console.log(`[scheduler] Webhook push done: ${result.stored} sources sent`);
-  } catch (err) {
-    console.error('[scheduler] Webhook push error:', err?.message || err);
-  }
-}, {
-  timezone: 'America/Los_Angeles',
-});
+  // ── Start all cron jobs ──
+  task.start();
+  memoryTask.start();
+  backupTask.start();
+  suggestionTask.start();
+  evoTask.start();
+  graphTask.start();
+  pipelineTask.start();
+  nightlyTask.start();
+  webhookPushTask.start();
 
-task.start();
-memoryTask.start();
-backupTask.start();
-evoTask.start();
-graphTask.start();
-pipelineTask.start();
-suggestionTask.start();
-nightlyTask.start();
+  logger.info('[Scheduler] All node-cron jobs started');
+} // end if (!IS_CLOUD_RUN)
 
 async function gracefulShutdown(signal) {
   console.log(`[scheduler] Received ${signal}, stopping all cron tasks...`);
