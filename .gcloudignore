@@ -1,0 +1,81 @@
+# ═══════════════════════════════════════════════════════════════
+# .gcloudignore — Files excluded from Cloud Run deploy
+# ═══════════════════════════════════════════════════════════════
+
+# Version control
+.git
+.gitignore
+
+# Node modules (Cloud Run installs from package.json)
+node_modules
+
+# Environment files (use Cloud Run env vars instead)
+.env
+.env.*
+!.env.example
+
+# Development & debugging
+*.log
+*.bak
+debug_score.cjs
+test_fail.txt
+start.ps1
+patch2.py
+
+# Tests
+tests/
+coverage/
+jest.config.js
+*.test.*
+*.spec.*
+
+# Documentation (not needed in production container)
+*.md
+!README.md
+docs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large / generated artifacts
+artifacts/
+backups/
+media/
+library/
+llama.cpp/
+models/
+*.db
+*.sqlite
+*.sqlite3
+
+# Infrastructure (not needed for Cloud Run API)
+infrastructure/
+Dockerfile.sandbox
+ecosystem.config.cjs
+
+# Local LLM server (not needed in Cloud Run)
+local_llm_server.js
+
+# Scripts that run locally only
+scripts/
+
+# Data files (use Cloud SQL / Firestore in production)
+data/
+knowledge.txt
+flashcards.csv
+summary.txt
+transition_matrix.json
+user_state.json
+analysis.json
+report-*.json
+report-*.md
+
+# Experimental
+experimental/

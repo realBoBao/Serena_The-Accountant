@@ -550,10 +550,10 @@ client.on(Events.MessageCreate, async (message) => {
         const validDepths = ['concise', 'detailed', 'auto'];
 
         if (validStyles.includes(value)) {
-          userProfileManager.setPreference(message.author.id, 'style', value);
+          userProfileManager.setUserPreference(message.author.id, { style: value });
           await message.reply(`✅ Đã cập nhật phong cách học: \`${value}\``);
         } else if (validDepths.includes(value)) {
-          userProfileManager.setPreference(message.author.id, 'depth', value);
+          userProfileManager.setUserPreference(message.author.id, { depth: value });
           await message.reply(`✅ Đã cập nhật độ chi tiết: \`${value}\``);
         } else {
           await message.reply('📋 Dùng: `!prefer example_first | theory_first | code_heavy | visual | concise | detailed | auto`');

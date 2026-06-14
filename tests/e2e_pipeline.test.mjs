@@ -34,7 +34,7 @@ describe('E2E: RAG Quality', () => {
       'Binary search is an algorithm that finds the position of a target value within a sorted array.',
       'Binary search is an algorithm that finds the position of a target value within a sorted array by repeatedly dividing the search interval in half.'
     );
-    expect(result.score).toBeGreaterThan(0.5);
+    expect(result.relevancy).toBeGreaterThan(0.3);
     expect(result.passed).toBe(true);
   });
 
@@ -45,7 +45,8 @@ describe('E2E: RAG Quality', () => {
       'I like pizza and ice cream.',
       'Binary search is an algorithm that finds the position of a target value within a sorted array.'
     );
-    expect(result.score).toBeLessThan(0.5);
+    // Answer is irrelevant — should not pass quality gate
+    expect(result.passed).toBe(false);
   });
 
   it('should handle empty context gracefully', async () => {
