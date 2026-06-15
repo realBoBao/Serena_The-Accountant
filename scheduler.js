@@ -296,6 +296,12 @@ if (RUN_ON_START) {
         return;
       }
     } catch { /* ignore */ }
+
+    // Skip startup run — cron jobs handle scheduled runs
+    // Catch-up logic above handles missed jobs
+    console.log('[scheduler] Startup pipeline skipped — waiting for cron schedule');
+    return;
+
     try {
       runPipeline();
     } catch (err) {
