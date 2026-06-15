@@ -351,8 +351,26 @@ if (!IS_CLOUD_RUN) {
     logger.info('[scheduler] EvoAgent analysis triggered');
     try {
       const { autoEvaluate } = await import('./agents/EvoAgent.js');
-      await autoEvaluate();
+      const result = await autoEvaluate();
       await saveLastRun('evo');
+      // Gửi Discord notification nếu có warnings
+      if (result?.warnings?.length > 0) {
+        try {
+          const { sendAggregatedWebhook } = await import('./notify_discord.js');
+          await sendAggregatedWebhook({
+            topic: `🔍 EvoAgent Report — ${new Date().toLocaleDateString('vi-VN')}`,
+            results: result.warnings.map(w => ({
+              title: w.message || w.type || 'Warning',
+              url: '',
+              type: 'evo',
+              score: 0.5,
+              category: 'System',
+            })),
+            bullets: `${result.warnings.length} warning(s) detected`,
+            isError: !result.healthy,
+          });
+        } catch (webhookErr) { /* ignore */ }
+      }
     } catch (err) {
       logger.error('[scheduler] EvoAgent error:', err?.message || err);
     }
@@ -380,6 +398,25 @@ if (!IS_CLOUD_RUN) {
       const result = await runContextMonitor();
       if (result?.message) {
         logger.info(`[scheduler] Proactive suggestions: ${result.suggestions.length}`);
+        // Gửi Discord notification
+        try {
+          const { sendAggregatedWebhook } = await import('./notify_discord.js');
+          await sendAggregatedWebhook({
+            topic: `💡 Gợi ý học tập — ${new Date().toLocaleDateString('vi-VN')}`,
+            results: (result.suggestions || []).map(s => ({
+              title: s.title || 'Gợi ý',
+              url: s.url || '',
+              type: 'suggestion',
+              score: 0.5,
+              category: 'Learning',
+            })),
+            bullets: result.message,
+            isError: false,
+          });
+          logger.info('[scheduler] Suggestion notification sent to Discord');
+        } catch (webhookErr) {
+          logger.error('[scheduler] Suggestion webhook failed:', webhookErr?.message || webhookErr);
+        }
       }
     } catch (err) {
       logger.error('[scheduler] Suggestion error:', err?.message || err);
