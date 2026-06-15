@@ -1,148 +1,107 @@
 ﻿/**
- * Tests for InteractionAgent — Lễ tân & Khởi tạo Phiên
- * ESM-compatible: manual mocks thay vì jest.mock()
+ * Tests for InteractionAgent — Discord interaction session management
+ * Tests plain function exports from agents/InteractionAgent.js
  */
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect } from '@jest/globals';
+import {
+  createSession,
+  getSession,
+  updateSession,
+  deleteSession,
+  handleInteraction,
+} from '../agents/InteractionAgent.js';
 
-// ── Manual mocks ──────────────────────────────────────────────────────────
-const mockPipeline = {
-  hset: jest.fn(),
-  expire: jest.fn(),
-  exec: jest.fn().mockResolvedValue([[null, 1], [null, 1]]),
-};
-const mockRedis = {
-  pipeline: jest.fn().mockReturnValue(mockPipeline),
-  hset: jest.fn().mockResolvedValue('OK'),
-  hgetall: jest.fn().mockResolvedValue({}),
-  on: jest.fn(),
-  disconnect: jest.fn(),
-  status: 'ready',
-};
-const mockAddJob = jest.fn().mockResolvedValue({ id: 'job-mock-123' });
+describe('InteractionAgent — Session Management', () => {
+  it('should create and retrieve a session', () => {
+    const id = 'test-session-1';
+    createSession(id, { userId: 'u-1', source: 'discord' });
 
-// ── Import module under test ───────────────────────────────────────────────
-const mod = await import('../agents/InteractionAgent.js');
-const InteractionAgent = mod.default || mod.InteractionAgent;
+    const session = getSession(id);
+    expect(session).toBeDefined();
+    expect(session.userId).toBe('u-1');
+    expect(session.source).toBe('discord');
+    expect(session.createdAt).toBeDefined();
 
-// ── Tests ──────────────────────────────────────────────────────────────────
-describe('InteractionAgent', () => {
-  let agent;
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockPipeline.exec.mockResolvedValue([[null, 1], [null, 1]]);
-    mockAddJob.mockResolvedValue({ id: 'job-mock-123' });
-    agent = new InteractionAgent({ logger: { info: jest.fn(), error: jest.fn(), debug: jest.fn() } });
-  });
-  afterEach(() => { agent.destroy(); });
-
-  describe('generateSessionId()', () => {
-    it('returns a valid UUID v4', () => {
-      const id = InteractionAgent.generateSessionId();
-      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-    });
-
-    it('returns unique IDs', () => {
-      const ids = new Set();
-      for (let i = 0; i < 100; i++) ids.add(InteractionAgent.generateSessionId());
-      expect(ids.size).toBe(100);
-    });
+    // Cleanup
+    deleteSession(id);
   });
 
-  describe('receive()', () => {
-    it('creates session, saves Redis, dispatches planner job', async () => {
-      const result = await agent.receive({
-        source: 'discord', userId: 'u-1', username: 'alice', channelId: 'ch-1', content: 'Hello!',
-      });
-      expect(result.sessionId).toBeDefined();
-      expect(result.error).toBeNull();
-      expect(result.statusCode).toBe(200);
-      expect(result.state.source).toBe('discord');
-      expect(result.state.content).toBe('Hello!');
-    });
-
-    it('handles missing optional fields', async () => {
-      const result = await agent.receive({ source: 'rest_api', content: 'Test' });
-      expect(result.sessionId).toBeDefined();
-      expect(result.error).toBeNull();
-    });
-
-    it('rejects invalid source', async () => {
-      const result = await agent.receive({ source: 'invalid_source', content: 'Test' });
-      expect(result.error).toBeDefined();
-      expect(result.statusCode).toBe(400);
-    });
-
-    it('rejects empty content', async () => {
-      const result = await agent.receive({ source: 'discord', content: '' });
-      expect(result.error).toBeDefined();
-      expect(result.statusCode).toBe(400);
-    });
+  it('should return undefined for missing session', () => {
+    expect(getSession('nonexistent')).toBeUndefined();
   });
 
-  describe('receive() with Discord input', () => {
-    it('processes Discord message correctly', async () => {
-      const result = await agent.receive({
-        source: 'discord', userId: 'u1', username: 'test',
-        channelId: 'c1', content: '!ask What is AI?',
-      });
-      expect(result.sessionId).toBeDefined();
-      expect(result.state.content).toBe('!ask What is AI?');
-      expect(result.state.source).toBe('discord');
-    });
+  it('should update a session', () => {
+    const id = 'test-session-2';
+    createSession(id, { userId: 'u-2' });
 
-    it('handles input with attachments', async () => {
-      const result = await agent.receive({
-        source: 'discord', userId: 'u1', username: 'test',
-        channelId: 'c1', content: 'Check this',
-        attachmentCount: 1, hasImage: true,
-      });
-      expect(result.sessionId).toBeDefined();
-      expect(result.state.attachmentCount).toBe(1);
-      expect(result.state.hasImage).toBe(true);
-    });
+    updateSession(id, { status: 'active', content: 'Hello' });
+
+    const session = getSession(id);
+    expect(session.userId).toBe('u-2');
+    expect(session.status).toBe('active');
+    expect(session.content).toBe('Hello');
+    expect(session.updatedAt).toBeDefined();
+
+    deleteSession(id);
   });
 
-  describe('receive() with REST API input', () => {
-    it('processes REST API request', async () => {
-      const result = await agent.receive({
-        source: 'rest_api', content: 'Hello from API',
-      });
-      expect(result.sessionId).toBeDefined();
-      expect(result.state.content).toBe('Hello from API');
-      expect(result.state.source).toBe('rest_api');
-    });
+  it('should delete a session', () => {
+    const id = 'test-session-3';
+    createSession(id, {});
+    deleteSession(id);
+
+    expect(getSession(id)).toBeUndefined();
   });
 
-  describe('getStats()', () => {
-    it('returns stats object', () => {
-      const stats = agent.getStats();
-      expect(stats).toHaveProperty('totalReceived');
-    });
+  it('should create session with empty data', () => {
+    const id = 'test-session-4';
+    const result = createSession(id);
+
+    expect(result).toBe(id);
+    const session = getSession(id);
+    expect(session).toBeDefined();
+    expect(session.createdAt).toBeDefined();
+
+    deleteSession(id);
+  });
+});
+
+describe('InteractionAgent — handleInteraction', () => {
+  it('should handle quiz interaction', async () => {
+    const result = await handleInteraction({ customId: 'quiz_answer_1', type: 3 });
+    expect(result.handled).toBe(true);
+    expect(result.type).toBe('quiz');
   });
 
-  describe('health()', () => {
-    it('returns healthy status', () => {
-      expect(agent.health().status).toBe('healthy');
-    });
+  it('should handle debate interaction', async () => {
+    const result = await handleInteraction({ customId: 'debate_vote_pro', type: 3 });
+    expect(result.handled).toBe(true);
+    expect(result.type).toBe('debate');
   });
 
-  describe('handleInteraction()', () => {
-    it('processes interaction topic via named export', async () => {
-      const result = await mod.handleInteraction('test-topic');
-      expect(result).toBeDefined();
-    });
+  it('should handle flashcard interaction', async () => {
+    const result = await handleInteraction({ customId: 'flashcard_review_1', type: 3 });
+    expect(result.handled).toBe(true);
+    expect(result.type).toBe('flashcard');
   });
 
-  describe('updateStatus()', () => {
-    it('updates session status in memory', async () => {
-      await agent.updateStatus('test-session', 'completed');
-      expect(true).toBe(true); // No error thrown
-    });
+  it('should return unhandled for unknown customId', async () => {
+    const result = await handleInteraction({ customId: 'unknown_action', type: 3 });
+    expect(result.handled).toBe(false);
   });
 
-  describe('destroy()', () => {
-    it('cleans up without error', () => {
-      expect(() => agent.destroy()).not.toThrow();
-    });
+  it('should return unhandled for missing customId', async () => {
+    const result = await handleInteraction({ type: 3 });
+    expect(result.handled).toBe(false);
+  });
+
+  it('should handle null interaction gracefully', async () => {
+    const result = await handleInteraction(null);
+    expect(result.handled).toBe(false);
+  });
+
+  it('should handle non-object interaction gracefully', async () => {
+    const result = await handleInteraction('string');
+    expect(result.handled).toBe(false);
   });
 });

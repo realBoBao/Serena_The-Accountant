@@ -1,7 +1,6 @@
 /**
- * ═══════════════════════════════════════════════════════════════
  * Work Stealing Scheduler Unit Tests
- * ═══════════════════════════════════════════════════════════════
+ * Tests Deque + WorkStealingScheduler from lib/work_stealer.js
  */
 
 import { describe, it, expect } from '@jest/globals';
@@ -17,7 +16,7 @@ describe('Deque', () => {
     expect(d.pop()).toBe('c');
     expect(d.pop()).toBe('b');
     expect(d.pop()).toBe('a');
-    expect(d.pop()).toBeUndefined();
+    expect(d.pop()).toBeNull();
   });
 
   it('should steal from bottom (FIFO)', () => {
@@ -29,7 +28,7 @@ describe('Deque', () => {
     expect(d.steal()).toBe('a');
     expect(d.steal()).toBe('b');
     expect(d.steal()).toBe('c');
-    expect(d.steal()).toBeUndefined();
+    expect(d.steal()).toBeNull();
   });
 
   it('should handle mixed pop and steal', () => {
@@ -48,7 +47,7 @@ describe('Deque', () => {
   it('should report size correctly', () => {
     const d = new Deque();
     expect(d.size).toBe(0);
-    expect(d.isEmpty).toBe(true);
+    expect(d.empty).toBe(true);
 
     d.push('a');
     expect(d.size).toBe(1);
@@ -61,88 +60,64 @@ describe('Deque', () => {
 
     d.steal();
     expect(d.size).toBe(0);
-    expect(d.isEmpty).toBe(true);
+    expect(d.empty).toBe(true);
   });
 });
 
 describe('WorkStealingScheduler', () => {
-  it('should execute a single task', async () => {
-    const scheduler = new WorkStealingScheduler({
-      numWorkers: 2,
-      taskRunner: async (task) => {
-        return task.args[0] * 2;
-      },
-    });
+  it('should submit tasks to workers', () => {
+    const scheduler = new WorkStealingScheduler(2);
+    scheduler.submit('task1', 0);
+    scheduler.submit('task2', 0);
+    scheduler.submit('task3', 1);
 
-    // Start scheduler in background
-    scheduler.start().catch(() => {});
-
-    // Wait for workers to be ready
-    await new Promise(r => setTimeout(r, 50));
-
-    const result = await scheduler.submit({
-      id: 'test-1',
-      fn: (x) => x * 2,
-      args: [5],
-    });
-
-    const taskResult = await result;
-    await scheduler.stop();
-
-    expect(taskResult).toBe(10);
-  }, 10000);
-
-  it('should track stats', () => {
-    const scheduler = new WorkStealingScheduler({
-      numWorkers: 4,
-      taskRunner: async () => {},
-    });
-
-    const stats = scheduler.getStats();
-    expect(stats.numWorkers).toBe(4);
-    expect(stats.queueSizes).toHaveLength(4);
-    expect(stats.queueSizes.every(s => s === 0)).toBe(true);
+    expect(scheduler.workers[0].size).toBe(2);
+    expect(scheduler.workers[1].size).toBe(1);
   });
 
-  it('should track stats correctly', async () => {
-    const scheduler = new WorkStealingScheduler({
-      numWorkers: 2,
-      taskRunner: async (task) => {
-        await new Promise(r => setTimeout(r, 10));
-        return `result-${task.id}`;
-      },
+  it('should submit to random worker when no workerId', () => {
+    const scheduler = new WorkStealingScheduler(4);
+    for (let i = 0; i < 100; i++) {
+      scheduler.submit(`task-${i}`);
+    }
+
+    const total = scheduler.workers.reduce((sum, w) => sum + w.size, 0);
+    expect(total).toBe(100);
+  });
+
+  it('should run tasks with processor', async () => {
+    const scheduler = new WorkStealingScheduler(2);
+    const results = [];
+
+    scheduler.submit('a', 0);
+    scheduler.submit('b', 0);
+    scheduler.submit('c', 1);
+
+    await scheduler.run(async (task) => {
+      results.push(task);
     });
 
-    // Submit tasks directly to deques without starting the scheduler loop
-    scheduler.deques[0].push({
-      id: 'direct-1',
-      fn: () => {},
-      args: [],
-      resolve: () => {},
-      reject: () => {},
-      submittedAt: Date.now(),
-    });
-    scheduler.deques[0].push({
-      id: 'direct-2',
-      fn: () => {},
-      args: [],
-      resolve: () => {},
-      reject: () => {},
-      submittedAt: Date.now(),
+    expect(results.sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('should stop running', async () => {
+    const scheduler = new WorkStealingScheduler(2);
+    scheduler.submit('task1', 0);
+
+    const runPromise = scheduler.run(async () => {
+      scheduler.stop();
     });
 
-    expect(scheduler.deques[0].size).toBe(2);
-    expect(scheduler.deques[1].size).toBe(0);
+    await runPromise;
+    expect(scheduler.running).toBe(false);
+  });
 
-    // Pop one task
-    const task = scheduler.deques[0].pop();
-    expect(task.id).toBe('direct-2');
-    expect(scheduler.deques[0].size).toBe(1);
+  it('should ignore invalid workerId', () => {
+    const scheduler = new WorkStealingScheduler(2);
+    scheduler.submit('task1', -1);
+    scheduler.submit('task2', 99);
 
-    // Steal from worker 0's deque (has 1 task remaining)
-    const stolen = scheduler._stealFromOthers(1);
-    expect(stolen).not.toBeNull();
-    expect(stolen.id).toBe('direct-1');
-    expect(scheduler.deques[0].size).toBe(0);
+    const total = scheduler.workers.reduce((sum, w) => sum + w.size, 0);
+    expect(total).toBe(2);
   });
 });

@@ -1,12 +1,11 @@
 /**
- * PlannerAgent Tests — OODA Loop + DAG Execution
- * Uses jest.unstable_mockModule for ESM compatibility
+ * PlannerAgent Tests — DAG Plan Creation
+ * Tests createPlan() and createVisionFirstPlan() from agents/PlannerAgent.js
  */
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 
 // ── Mock llm.js ──
 const mockLlmAsk = jest.fn();
-const mockAddJob = jest.fn().mockResolvedValue({ id: 'job-1' });
 
 jest.unstable_mockModule('../lib/llm.js', () => ({
   __esModule: true,
@@ -14,95 +13,104 @@ jest.unstable_mockModule('../lib/llm.js', () => ({
   default: { ask: mockLlmAsk },
 }));
 
-jest.unstable_mockModule('../lib/task_queue.js', () => ({
-  __esModule: true,
-  addJob: mockAddJob,
-  QueueName: { PLANNER: 'planner-tasks', PRIORITY: 'priority-tasks', EVOLUTION: 'evolution-tasks', GRAPH: 'graph-tasks' },
-}));
-
-jest.unstable_mockModule('../lib/session_store.js', () => ({
-  __esModule: true,
-  createSession: jest.fn().mockResolvedValue({ id: 'test-session' }),
-  getSession: jest.fn().mockResolvedValue({ id: 'test-session', dag: [], results: {}, status: 'running' }),
-  updateSession: jest.fn().mockResolvedValue({}),
-  saveStepResult: jest.fn().mockResolvedValue({}),
-  addHistoryEntry: jest.fn().mockResolvedValue({}),
-  deleteSession: jest.fn().mockResolvedValue(true),
-  listSessions: jest.fn().mockResolvedValue([]),
-}));
-
 // ── Dynamic import after mock setup ──
-const { PlannerAgent } = await import('../agents/PlannerAgent.js');
-
-// ── Helpers ──
-function makeRequest(overrides = {}) {
-  return { type: 'message', content: 'Giải thích thuật toán quicksort', ...overrides };
-}
-
-function makeAgent(opts = {}) {
-  const agent = new PlannerAgent({
-    apiKey: 'test-key',
-    model: 'test-model',
-    tryLocalLlm: opts.tryLocalLlm ?? null,
-    agentModules: opts.agentModules ?? {},
-  });
-  return { agent, mockLlmAsk };
-}
+const { createPlan, createVisionFirstPlan } = await import('../agents/PlannerAgent.js');
 
 // ── Tests ──
-describe('PlannerAgent — OODA Loop', () => {
+describe('PlannerAgent — createPlan', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('should create a plan with valid LLM response', async () => {
     mockLlmAsk.mockResolvedValue(JSON.stringify({
-      completed: false,
-      nextStep: 1,
-      reasoning: 'Need to search first',
+      goal: 'Explain quicksort',
+      steps: [
+        { id: 'step1', action: 'Research quicksort algorithm', dependsOn: [], agent: 'RagAgent' },
+        { id: 'step2', action: 'Write implementation', dependsOn: ['step1'], agent: 'CoderAgent' },
+      ],
     }));
+
+    const result = await createPlan('Explain quicksort algorithm');
+
+    expect(result).toBeDefined();
+    expect(result.goal).toBe('Explain quicksort');
+    expect(result.steps).toHaveLength(2);
+    expect(result.steps[0].agent).toBe('RagAgent');
+    expect(result.steps[1].dependsOn).toEqual(['step1']);
   });
 
-  it('should create a session', () => {
-    // Skip actual session creation — requires working LLM mock in ESM
-    const { agent } = makeAgent();
-    expect(agent).toBeDefined();
+  it('should handle LLM failure gracefully with fallback', async () => {
+    mockLlmAsk.mockRejectedValue(new Error('LLM down'));
+
+    const result = await createPlan('test query');
+
+    expect(result).toBeDefined();
+    expect(result.goal).toBe('test query');
+    expect(result.steps).toHaveLength(1);
+    expect(result.steps[0].agent).toBe('CoderAgent');
+    expect(result.error).toBe('LLM down');
   });
 
-  it('should execute DAG with dependency results', async () => {
-    const { agent } = makeAgent();
-    const dag = [
-      { step: 1, agent: 'RagAgent', action: 'search', depends_on: null },
-      { step: 2, agent: 'CoderAgent', action: 'code', depends_on: 1 },
-    ];
-    // executeDagSync may throw if LLM mock doesn't work in ESM
-    // Just verify the agent can be created and DAG is valid
-    expect(agent).toBeDefined();
-    expect(dag.length).toBe(2);
-    expect(dag[1].depends_on).toBe(1);
+  it('should handle non-JSON LLM response with fallback', async () => {
+    mockLlmAsk.mockResolvedValue('This is not JSON at all');
+
+    const result = await createPlan('test query');
+
+    expect(result).toBeDefined();
+    expect(result.goal).toBe('test query');
+    expect(result.steps).toHaveLength(1);
+    expect(result.error).toBeDefined();
   });
 
-  it('should handle LLM failure gracefully', async () => {
-    // Mock LLM to fail — agent should handle it without crashing
-    mockLlmAsk.mockRejectedValueOnce(new Error('LLM down'));
-    const { agent } = makeAgent();
-    // The agent may throw or return a session — either is acceptable
-    let threw = false;
-    try {
-      await agent.startSession('test-fail', makeRequest());
-    } catch {
-      threw = true;
-    }
-    // As long as it doesn't crash the process, it's fine
-    expect(threw === true || threw === false).toBe(true);
+  it('should return empty steps array when LLM returns no steps', async () => {
+    mockLlmAsk.mockResolvedValue(JSON.stringify({ goal: 'test' }));
+
+    const result = await createPlan('test');
+
+    expect(result.steps).toEqual([]);
   });
 });
 
-describe('PlannerAgent — Heuristic Fallback', () => {
-  it('should fallback to heuristic when LLM fails', async () => {
-    mockLlmAsk.mockRejectedValue(new Error('LLM timeout'));
-    const { agent } = makeAgent();
-    const dag = [
-      { step: 1, agent: 'RagAgent', action: 'search', depends_on: null },
-    ];
-    const result = await agent.executeDagSync('test-heuristic', dag, {});
+describe('PlannerAgent — createVisionFirstPlan', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should create a vision-first plan', async () => {
+    mockLlmAsk.mockResolvedValue(JSON.stringify({
+      goal: 'Build a web app from mockup',
+      steps: [
+        { id: 'step1', action: 'Analyze mockup layout', dependsOn: [], agent: 'VisionAgent' },
+        { id: 'step2', action: 'Generate HTML/CSS', dependsOn: ['step1'], agent: 'CoderAgent' },
+      ],
+    }));
+
+    const result = await createVisionFirstPlan({
+      imageDescription: 'A login form with username and password fields',
+      userQuery: 'Build this login page',
+      userId: 'user-1',
+    });
+
     expect(result).toBeDefined();
+    expect(result.goal).toBe('Build a web app from mockup');
+    expect(result.steps).toHaveLength(2);
+    expect(result.visionDescription).toBe('A login form with username and password fields');
+    expect(result.userQuery).toBe('Build this login page');
+  });
+
+  it('should handle LLM failure in vision-first plan', async () => {
+    mockLlmAsk.mockRejectedValue(new Error('Vision LLM down'));
+
+    const result = await createVisionFirstPlan({
+      imageDescription: 'A chart',
+      userQuery: 'Analyze this chart',
+      userId: 'user-1',
+    });
+
+    expect(result).toBeDefined();
+    expect(result.goal).toBe('Analyze this chart');
+    expect(result.steps).toHaveLength(1);
+    expect(result.error).toBe('Vision LLM down');
   });
 });
