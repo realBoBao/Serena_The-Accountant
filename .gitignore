@@ -1,81 +1,42 @@
-# ═══════════════════════════════════════════════════════════
-# DEPENDENCIES
-# ═══════════════════════════════════════════════════════════
+# Dependencies
 node_modules/
+npm-debug.log
+package-lock.json
 
-# ═══════════════════════════════════════════════════════════
-# SECURITY — Never commit secrets
-# ═══════════════════════════════════════════════════════════
+# Environment
 .env
 .env.local
-.env.production
-*.pem
-*.key
-vertex-key.json
+.env.*.local
 
-# ═══════════════════════════════════════════════════════════
-# DATABASES — Local data (large, user-specific)
-# ═══════════════════════════════════════════════════════════
+# Database
 *.db
-*.sqlite
-*.sqlite3
-embedding_cache.db
-bm25_index.db
+*.db-shm
+*.db-wal
+data/
 
-# ═══════════════════════════════════════════════════════════
-# DATA & BACKUPS — Generated artifacts
-# ═══════════════════════════════════════════════════════════
+# Artifacts
 artifacts/
+public/videos/
 backups/
-*.csv
-qdrant_storage/
 
-# ═══════════════════════════════════════════════════════════
-# MEDIA — Generated videos/images
-# ═══════════════════════════════════════════════════════════
-media/
-*.mp4
-*.png
-*.jpg
-*.jpeg
-
-# ═══════════════════════════════════════════════════════════
-# LARGE FILES — Use Git LFS or keep local only
-# ═══════════════════════════════════════════════════════════
-llama.cpp/
-models/*.gguf
-models/*.bin
-models/*.safetensors
-
-# ═══════════════════════════════════════════════════════════
-# OS & EDITOR
-# ═══════════════════════════════════════════════════════════
-.DS_Store
-Thumbs.db
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# ═══════════════════════════════════════════════════════════
-# LOGS
-# ═══════════════════════════════════════════════════════════
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
 *.log
 logs/
+
+# Test coverage
 coverage/
 
-# ═══════════════════════════════════════════════════════════
-# TEMP FILES
-# ═══════════════════════════════════════════════════════════
+# Temp
 *.tmp
 *.temp
-debug_*.mjs
-debug_*.js
-check_*.mjs
-check_*.js
-
-# ═══════════════════════════════════════════════════════════
-# RUNTIME DATA — Generated at runtime, not for git
-# ═══════════════════════════════════════════════════════════
-.query_dedup.json
-.scheduler_last_run.json
+/tmp/

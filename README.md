@@ -41,12 +41,29 @@ Answer ← Confidence Scoring ← Self-Reflect Gate ← LLM Synthesis ← HyDE +
 | Tầng | Công nghệ | Mô tả |
 |---|---|---|
 | **Semantic Cache** | Embedding cosine similarity (≥0.92) | Tránh gọi API cho câu hỏi lặp |
-| **Vector Search** | SQLite / Qdrant / BigQuery | Tìm kiếm ngữ nghĩa |
+| **Vector Search** | SQLite (HNSW index) | Tìm kiếm ngữ nghĩa O(log N) |
 | **BM25 Search** | Full-text TF-IDF | Tìm kiếm từ khóa |
 | **HyDE** | Hypothetical Document Embeddings | Tạo câu trả lời giả để tìm context tốt hơn |
 | **Query Expansion** | LLM-generated variants | Mở rộng câu hỏi với từ đồng nghĩa |
 | **Knowledge Graph** | SQLite BFS traversal | Bổ sung mối quan hệ giữa các khái niệm |
 | **Confidence Scoring** | 4-signal aggregation | Retrieval + Consensus + Source + Self-Check |
+
+### Multi-Source Web Search (7 nguồn)
+```
+Pipeline → GitHub + YouTube + arXiv + Reddit + StackOverflow + HackerNews + Tavily
+         ↓
+    ~30-40 sources/lần chạy → Score-based ranking → Dedup (URL + hash)
+```
+
+| Nguồn | Max Results | Score | Hash Check |
+|---|---|---|---|
+| **GitHub** | 3-5 | 0.5-1.0 | stargazers_count |
+| **YouTube** | 3-5 | 0.3-0.9 | viewCount |
+| **arXiv** | 3 | 0.4-0.8 | published date |
+| **Reddit** | 3-5 | 0.3-0.7 | score |
+| **StackOverflow** | 5 | 0.3-0.9 | score |
+| **HackerNews** | 5 | 0.2-0.8 | points |
+| **Tavily** | 3 | 0.4-0.6 | snippet |
 
 ### Học tập
 - **Spaced Repetition** (FSRS thay SM-2) — thuật toán tối ưu interval ôn tập
@@ -300,7 +317,7 @@ node scripts/test_scheduler.js --run-pipeline
 # Build & deploy
 gcloud run deploy bot-name \
   --source . \
-  --project gen-lang-client-0524859745 \
+  --project Project_ID \
   --region us-central1 \
   --allow-unauthenticated \
   --set-env-vars REST_API_KEY=...,DISCORD_BOT_TOKEN=...,GEMINI_API_KEY=...

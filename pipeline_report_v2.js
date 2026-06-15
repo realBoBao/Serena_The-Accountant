@@ -565,32 +565,32 @@ async function run(topic = null, isForce = false){
     }
   }
 
-  // ── Google Custom Search (broad web search, up to 10 results per query) ──
-  async function googleSearch(topic, maxResults = 10) {
-    const apiKey = process.env.GOOGLE_API_KEY;
-    const cx = process.env.GOOGLE_CSE_ID || process.env.GOOGLE_CX || '';
-    if (!apiKey || !cx) {
-      console.log('[search] Google: No GOOGLE_API_KEY or GOOGLE_CSE_ID, skipping');
-      return [];
-    }
-    try {
-      const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${encodeURIComponent(cx)}&q=${encodeURIComponent(topic)}&num=${maxResults}`;
-      const res = await fetchWithRetry(url);
-      if (!res.ok) throw new Error(`Google search ${res.status}`);
-      const data = await res.json();
-      return (data.items || []).map(r => ({
-        id: r.link,
-        title: r.title || 'Web Result',
-        url: r.link,
-        snippet: r.snippet?.slice(0, 300) || '',
-        score: 0.5,
-        source: 'google',
-      }));
-    } catch (err) {
-      console.warn('[search] Google failed:', err.message);
-      return [];
-    }
-  }
+  // // ── Google Custom Search (broad web search, up to 10 results per query) ──
+  // async function googleSearch(topic, maxResults = 10) {
+  //   const apiKey = process.env.GOOGLE_SEARCH_API_KEY;
+  //   const cx = process.env.GOOGLE_CSE_ID || process.env.GOOGLE_CX || '';
+  //   if (!apiKey || !cx) {
+  //     console.log('[search] Google: No GOOGLE_SEARCH_API_KEY or GOOGLE_CSE_ID, skipping');
+  //     return [];
+  //   }
+  //   try {
+  //     const url = `https://customsearch.googleapis.com/customsearch/v1?key=${apiKey}&cx=${encodeURIComponent(cx)}&q=${encodeURIComponent(topic)}&num=${maxResults}`;
+  //     const res = await fetchWithRetry(url);
+  //     if (!res.ok) throw new Error(`Google search ${res.status}`);
+  //     const data = await res.json();
+  //     return (data.items || []).map(r => ({
+  //       id: r.link,
+  //       title: r.title || 'Web Result',
+  //       url: r.link,
+  //       snippet: r.snippet?.slice(0, 300) || '',
+  //       score: 0.5,
+  //       source: 'google',
+  //     }));
+  //   } catch (err) {
+  //     console.warn('[search] Google failed:', err.message);
+  //     return [];
+  //   }
+  // }
 
   const searchResults = await Promise.allSettled([
     githubSearch(chosenTopic),
@@ -600,7 +600,6 @@ async function run(topic = null, isForce = false){
     stackOverflowSearch(chosenTopic),
     hackerNewsSearch(chosenTopic),
     facebookWebSearch(chosenTopic),
-    googleSearch(chosenTopic),
   ]);
 
   const repos = searchResults[0]?.status === 'fulfilled' ? (searchResults[0].value || []) : [];
