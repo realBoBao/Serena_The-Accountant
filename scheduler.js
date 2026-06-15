@@ -1,8 +1,7 @@
 import { spawn } from 'child_process';
 import cron from 'node-cron';
 import { addJob, JobType, QueueName } from './lib/task_queue.js';
-import { getLogger } from './lib/logger.js';
-import { writeJsonAtomic, readJsonSafe } from './lib/atomic_write.js';
+import { getLogger } from './lib/logger.js';import { writeJsonAtomic, readJsonSafe } from './lib/atomic_write.js';
 
 const logger = getLogger('Scheduler');
 
@@ -331,11 +330,54 @@ if (!IS_CLOUD_RUN) {
     runBackup();
   }, { timezone: 'America/Los_Angeles' });
 
+  // ── EvoAgent: 4:00 AM mỗi ngày — Phân tích logs & tối ưu hệ thống ──
+  const EVO_CRON = '0 4 * * *';
+  const evoTask = cron.schedule(EVO_CRON, async () => {
+    logger.info('[scheduler] EvoAgent analysis triggered');
+    try {
+      const { autoEvaluate } = await import('./agents/EvoAgent.js');
+      await autoEvaluate();
+      await saveLastRun('evo');
+    } catch (err) {
+      logger.error('[scheduler] EvoAgent error:', err?.message || err);
+    }
+  }, { timezone: 'America/Los_Angeles' });
+
+  // ── GraphAgent: 5:00 AM Chủ Nhật — Đồng bộ Knowledge Graph ──
+  const GRAPH_CRON = '0 5 * * 0';
+  const graphTask = cron.schedule(GRAPH_CRON, async () => {
+    logger.info('[scheduler] GraphAgent sync triggered');
+    try {
+      const { syncGraph } = await import('./agents/GraphAgent.js');
+      await syncGraph();
+      await saveLastRun('graph');
+    } catch (err) {
+      logger.error('[scheduler] GraphAgent error:', err?.message || err);
+    }
+  }, { timezone: 'America/Los_Angeles' });
+
+  // ── Proactive Suggestion: 8:00 AM mỗi ngày ──
+  const SUGGESTION_CRON = '0 8 * * *';
+  const suggestionTask = cron.schedule(SUGGESTION_CRON, async () => {
+    logger.info('[scheduler] Proactive suggestion triggered');
+    try {
+      const { runContextMonitor } = await import('./agents/SuggestionAgent.js');
+      const result = await runContextMonitor();
+      if (result?.message) {
+        logger.info(`[scheduler] Proactive suggestions: ${result.suggestions.length}`);
+      }
+    } catch (err) {
+      logger.error('[scheduler] Suggestion error:', err?.message || err);
+    }
+  }, { timezone: 'America/Los_Angeles' });
 
   // ── Start all cron jobs ──
   task.start();
   memoryTask.start();
   backupTask.start();
+  evoTask.start();
+  graphTask.start();
+  suggestionTask.start();
 
   logger.info('[Scheduler] All node-cron jobs started');
 } // end if (!IS_CLOUD_RUN)
@@ -345,6 +387,9 @@ async function gracefulShutdown(signal) {
   task?.stop();
   memoryTask?.stop();
   backupTask?.stop();
+  evoTask?.stop();
+  graphTask?.stop();
+  suggestionTask?.stop();
 
   process.exit(0);
 }

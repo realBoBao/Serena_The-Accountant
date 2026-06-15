@@ -575,30 +575,30 @@ async function run(topic = null, isForce = false){
     facebookWebSearch(chosenTopic),
   ]);
 
-  const repos = searchResults[0].status === 'fulfilled' ? searchResults[0].value : [];
-  const videos = searchResults[1].status === 'fulfilled' ? searchResults[1].value : [];
-  const papers = searchResults[2].status === 'fulfilled' ? searchResults[2].value : [];
-  const reddits = searchResults[3].status === 'fulfilled' ? searchResults[3].value : [];
-  const stackoverflow = searchResults[4].status === 'fulfilled' ? searchResults[4].value : [];
-  const hackerNews = searchResults[5].status === 'fulfilled' ? searchResults[5].value : [];
-  const facebookPosts = searchResults[6].status === 'fulfilled' ? searchResults[6].value : [];
+  const repos = searchResults[0]?.status === 'fulfilled' ? (searchResults[0].value || []) : [];
+  const videos = searchResults[1]?.status === 'fulfilled' ? (searchResults[1].value || []) : [];
+  const papers = searchResults[2]?.status === 'fulfilled' ? (searchResults[2].value || []) : [];
+  const reddits = searchResults[3]?.status === 'fulfilled' ? (searchResults[3].value || []) : [];
+  const stackoverflow = searchResults[4]?.status === 'fulfilled' ? (searchResults[4].value || []) : [];
+  const hackerNews = searchResults[5]?.status === 'fulfilled' ? (searchResults[5].value || []) : [];
+  const facebookPosts = searchResults[6]?.status === 'fulfilled' ? (searchResults[6].value || []) : [];
 
   // Detailed logging for debugging
   const sourceSummary = [
-    { name: 'GitHub', count: repos.length, failed: searchResults[0].status === 'rejected', error: searchResults[0].reason?.message },
-    { name: 'YouTube', count: videos.length, failed: searchResults[1].status === 'rejected', error: searchResults[1].reason?.message },
-    { name: 'arXiv', count: papers.length, failed: searchResults[2].status === 'rejected', error: searchResults[2].reason?.message },
-    { name: 'Reddit', count: reddits.length, failed: searchResults[3].status === 'rejected', error: searchResults[3].reason?.message },
-    { name: 'StackOverflow', count: stackoverflow.length, failed: searchResults[4].status === 'rejected', error: searchResults[4].reason?.message },
-    { name: 'HackerNews', count: hackerNews.length, failed: searchResults[5].status === 'rejected', error: searchResults[5].reason?.message },
-    { name: 'Facebook/Tavily', count: facebookPosts.length, failed: searchResults[6].status === 'rejected', error: searchResults[6].reason?.message },
+    { name: 'GitHub', count: repos?.length || 0, failed: searchResults[0]?.status === 'rejected', error: searchResults[0]?.reason?.message },
+    { name: 'YouTube', count: videos?.length || 0, failed: searchResults[1]?.status === 'rejected', error: searchResults[1]?.reason?.message },
+    { name: 'arXiv', count: papers?.length || 0, failed: searchResults[2]?.status === 'rejected', error: searchResults[2]?.reason?.message },
+    { name: 'Reddit', count: reddits?.length || 0, failed: searchResults[3]?.status === 'rejected', error: searchResults[3]?.reason?.message },
+    { name: 'StackOverflow', count: stackoverflow?.length || 0, failed: searchResults[4]?.status === 'rejected', error: searchResults[4]?.reason?.message },
+    { name: 'HackerNews', count: hackerNews?.length || 0, failed: searchResults[5]?.status === 'rejected', error: searchResults[5]?.reason?.message },
+    { name: 'Facebook/Tavily', count: facebookPosts?.length || 0, failed: searchResults[6]?.status === 'rejected', error: searchResults[6]?.reason?.message },
   ];
   for (const s of sourceSummary) {
     if (s.failed) console.warn(`[search] ❌ ${s.name} FAILED: ${s.error}`);
     else if (s.count === 0) console.log(`[search] ⚠ ${s.name}: 0 results`);
     else console.log(`[search] ✓ ${s.name}: ${s.count} results`);
   }
-  console.log(`[search] Total: ${repos.length} repos, ${videos.length} videos, ${papers.length} papers, ${reddits.length} reddits, ${stackoverflow.length} SO, ${hackerNews.length} HN, ${facebookPosts.length} FB`);
+  console.log(`[search] Total: ${repos?.length || 0} repos, ${videos?.length || 0} videos, ${papers?.length || 0} papers, ${reddits?.length || 0} reddits, ${stackoverflow?.length || 0} SO, ${hackerNews?.length || 0} HN, ${facebookPosts?.length || 0} FB`);
 
   // ═══════════════════════════════════════════════════════════════
   // AGGREGATION: Thu thập tất cả results vào 1 mảng
@@ -940,7 +940,7 @@ async function run(topic = null, isForce = false){
         if (url) await markProcessed({ id: `url:${url.slice(0, 100)}`, type: 'source', url, hash: '' });
       }
 
-      console.log(`[Pipeline] ${freshResults.length}/${allResults.length} fresh sources (deduped ${allResults.length - freshResults.length})`);
+      console.log(`[Pipeline] ${freshResults.length}/${allResults?.length || 0} fresh sources (deduped ${(allResults?.length || 0) - freshResults.length})`);
 
       if (freshResults.length > 0) {
         // Có source mới → gửi thông báo
@@ -950,7 +950,7 @@ async function run(topic = null, isForce = false){
           bullets: `${freshResults.length} sources found across YouTube, GitHub, StackOverflow, HackerNews, arXiv, Facebook`,
         });
         console.log(`[Webhook] ✓ Sent aggregated embed with ${freshResults.length} sources`);
-      } else if (allResults.length > 0) {
+      } else if ((allResults?.length || 0) > 0) {
         // Không có source → gửi thông báo server status (để biết pipeline đã chạy)
         const errorSources = [];
         if (repos.length === 0) errorSources.push('GitHub');
@@ -1140,4 +1140,4 @@ const args = process.argv.slice(2);
 const isForce = args.includes('--force');
 const topicArg = args.find(arg => arg !== '--force');
 
-run(topicArg, isForce).catch(e=>{ console.error('Pipeline error:', e.message||e); process.exit(1); });
+run(topicArg, isForce).catch(e=>{ console.error('Pipeline error:', e.message||e); console.error(e.stack); process.exit(1); });

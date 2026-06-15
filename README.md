@@ -1,15 +1,13 @@
 # My AI Brain — Multi-Agent AI System
 
 > Hệ thống AI đa tác nhân tự học, tự tiến hóa, tự bảo mật.
-> **335 tests PASS (100%) | 22 test suites | PM2 Production Ready**
-
-![CI](https://github.com/realBoBao/Serena_Project00_Auto-Teaching/actions/workflows/ci.yml/badge.svg)
+> **Cloud Run Ready | PM2 Production | Ponytail Optimized**
 
 ---
 
 ## Tính năng chính
 
-### 22 AI Agents
+### 20 AI Agents
 | Agent | Vai trò |
 |---|---|
 | **RagAgent** | RAG-powered Q&A (Vector + BM25 + HyDE + Query Expansion + Confidence Scoring) |
@@ -19,21 +17,19 @@
 | **MentorAgent** | Senior Dev review code (Shadow Review) |
 | **IncidentAgent** | Chaos Engineering (8 loại sự cố production) |
 | **SecurityAuditor** | Quét bảo mật code (secrets, SQLi, XSS, path traversal) |
-| **PerformanceProfiler** | Phân tích performance & Big O |
-| **LogAnalyzer** | Phân tích logs thông minh |
 | **ManimAgent** | Tạo video animation (Manim) |
 | **VisionAgent** | Phân tích ảnh (Gemini Vision) |
 | **VoiceAgent** | Transcribe giọng nói (whisper.cpp) |
 | **PdfAgent** | Xử lý PDF/EPUB, trích xuất flashcards |
-| **GraphAgent** | Knowledge Graph (SQLite-backed, BFS traversal) |
-| **EvoAgent** | Self-evolution (A/B testing, hyperparameter tuning, OOM detection) |
+| **GraphAgent** | Knowledge Graph (entity extraction, relationship building) |
+| **EvoAgent** | Self-evolution (performance monitoring, knowledge gap detection) |
 | **SuggestionAgent** | Gợi ý học tập cá nhân hóa |
 | **AnalysisAgent** | Phân tích URL với Bloom Filter dedup |
-| **InteractionAgent** | Discord interaction tracking + Markov prediction |
+| **InteractionAgent** | Discord interaction tracking + session management |
 | **RouterAgent** | Intent classification + routing (lazy-loaded agents) |
-| **PlannerAgent** | OODA Loop DAG Task Planner (Redis sessions) |
-| **AgentWorker** | BullMQ job processor (cluster mode) |
+| **PlannerAgent** | OODA Loop DAG Task Planner (vision-first planning) |
 | **PlannerWorker** | OODA task dispatcher |
+| **GraphAgentLauncher** | GraphAgent standalone service launcher |
 
 ### RAG Pipeline (7 tầng)
 ```
@@ -57,7 +53,7 @@ Answer ← Confidence Scoring ← Self-Reflect Gate ← LLM Synthesis ← HyDE +
 - **Socratic Mode** — hỏi ngược, hint system, không đáp án trực tiếp
 - **Shadow Review** — ôn code cũ với MentorAgent
 - **Learning Path** — DAG từ Knowledge Graph + Topological Sort + Flashcard stats
-- **Confidence Scoring** — 4 tín hiệu đánh giá chất lượng câu trả lời
+- **Bandit-based Prompt Selection** — Thompson Sampling tối ưu prompt strategy
 
 ### Bảo mật
 - **4-layer sandbox** (Commands, Imports, Patterns, Exfiltration)
@@ -65,13 +61,15 @@ Answer ← Confidence Scoring ← Self-Reflect Gate ← LLM Synthesis ← HyDE +
 - **Rate limiting** (per-agent, per-IP)
 - **Audit logging** (mọi API call được log)
 - **Atomic file writes** (chống corrupt khi crash)
+- **Scope Detection** — chặn off-topic queries
 
 ### Monitoring
-- **Prometheus Metrics** (confidence scores, query latency, cache hit rate)
 - **F1 Score Dashboard** (`!f1stats`)
 - **👍/👎 Feedback** (per-response)
 - **Health checks** (auto-restart via PM2)
 - **Semantic Cache stats** (hit rate, entries)
+- **Performance Profiler** — CPU, memory, event loop monitoring
+- **Log Analyzer** — OOM detection, error pattern matching
 
 ---
 
@@ -116,25 +114,33 @@ node scheduler.js        # Cron jobs
 ### Cấu trúc thư mục
 
 ```
-├── agents/              # 22 AI agents
-│   ├── RagAgent.js      # RAG pipeline (54KB, core engine)
+├── agents/              # 20 AI agents
+│   ├── RagAgent.js      # RAG pipeline (core engine)
 │   ├── CoderAgent.js    # Code sandbox + self-debug
 │   ├── DebateAgent.js   # Multi-agent debate
 │   ├── EvoAgent.js      # Self-evolution
 │   ├── GraphAgent.js    # Knowledge Graph
+│   ├── PlannerAgent.js  # OODA DAG planner
 │   └── ...
-├── lib/                 # Core libraries
-│   ├── confidence_scorer.js   # 4-signal confidence scoring
-│   ├── semantic_cache.js      # Embedding-based query dedup
-│   ├── atomic_write.js        # Atomic JSON write/read
-│   ├── learning_path.js       # DAG learning path generator
-│   ├── knowledge_graph.js     # SQLite KG + BFS traversal
-│   ├── flashcard_db.js        # FSRS spaced repetition
+├── lib/                 # Core libraries (64 modules)
+│   ├── confidence_scorer.js    # 4-signal confidence scoring
+│   ├── semantic_cache.js       # Embedding-based query dedup
+│   ├── atomic_write.js         # Atomic JSON write/read
+│   ├── learning_path.js        # DAG learning path generator
+│   ├── knowledge_graph.js      # SQLite KG + BFS traversal
+│   ├── flashcard_db.js         # FSRS spaced repetition
+│   ├── bandit.js               # Thompson Sampling prompt selection
+│   ├── grounding_verifier.js   # Answer grounding verification
+│   ├── scope_detector.js       # Query scope detection
+│   ├── security_auditor.js     # Code security scanning
+│   ├── performance_profiler.js # System performance monitoring
+│   ├── log_analyzer.js         # Log analysis & OOM detection
+│   ├── study_csp.js            # Study scheduling (CSP)
+│   ├── repo_analyzer.js        # Repository analysis
+│   ├── user_profile.js         # User learning profile
 │   └── ...
-├── tests/               # 22 test files, 335 tests
-│   ├── e2e_pipeline.test.mjs  # E2E integration tests
-│   └── ...
-├── scripts/             # Setup & maintenance scripts
+├── tests/               # Test files
+├── scripts/             # Maintenance scripts (backup, restore, archive)
 ├── public/              # PWA mobile companion
 ├── artifacts/           # Generated reports
 └── backups/             # Auto-backups (weekly)
@@ -247,13 +253,19 @@ POST /api/notes                     → Quick note (iOS Shortcuts)
 
 ---
 
-## Cron Jobs
+## Cron Jobs (Scheduler)
 
-| Thời gian | Hành động |
+| Thời gian (PDT) | Hành động |
 |---|---|
-| 8:00 AM, 11:00 AM, 2:00 PM, 5:00 PM, 8:00 PM | Search & scrape sources |
-| 2:00 AM | Memory consolidation |
+| 8AM, 11AM, 2PM, 5PM, 8PM | Pipeline: search, scrape, embed, store |
+| 2:00 AM | Memory consolidation (archive old, embed recent) |
 | 3:00 AM (Sunday) | Full backup (DB + artifacts) |
+| 4:00 AM (daily) | EvoAgent: performance analysis + knowledge gap detection |
+| 5:00 AM (Sunday) | GraphAgent: knowledge graph sync |
+| 8:00 AM (daily) | SuggestionAgent: proactive learning suggestions |
+
+### Cloud Run Mode
+Khi chạy trên Cloud Run (`K_SERVICE` env set), node-cron bị disable. Thay vào đó dùng Google Cloud Scheduler → HTTP POST → `/scheduler/:job`.
 
 ---
 
@@ -269,11 +281,34 @@ npm run test:coverage
 # Run specific test
 node --experimental-vm-modules node_modules/jest/bin/jest.js tests/rag_agent.test.js
 
-# Run E2E tests
-node --experimental-vm-modules node_modules/jest/bin/jest.js tests/e2e_pipeline.test.mjs
+# Test all agents load correctly
+node scripts/test_agents.mjs
+
+# Test Discord webhook (gửi notification test ngay)
+node scripts/test_webhook.js
+
+# Test scheduler catch-up (xem job nào bị missed)
+node scripts/test_scheduler.js
+
+# Test pipeline (chạy thật, bypass check thời gian)
+node scripts/test_scheduler.js --run-pipeline
 ```
 
-**Current: 335 tests PASS (100%) | 22 suites**
+## Cloud Run Deployment
+
+```bash
+# Build & deploy
+gcloud run deploy bot-name \
+  --source . \
+  --project gen-lang-client-0524859745 \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --set-env-vars REST_API_KEY=...,DISCORD_BOT_TOKEN=...,GEMINI_API_KEY=...
+
+# Update env vars
+gcloud run services update bot-name \
+  --set-env-vars KEY=VALUE
+```
 
 ---
 
@@ -289,6 +324,19 @@ Features:
 - Voice input (Web Speech API, vi-VN)
 - Push notifications (flashcard reminders)
 - Knowledge Graph visualization (D3.js force-directed graph)
+
+---
+
+## Nguyên tắc Ponytail
+
+Dự án tuân theo triết lý **"Lazy Senior Dev"**:
+
+- **YAGNI** — Không build feature không cần
+- **Stdlib first** — Dùng native Node.js trước khi cài dependency
+- **One line** — Nếu làm được 1 dòng, không viết 50 dòng
+- **Deletion > Addition** — Xóa code cũ hơn là thêm code mới
+- **Boring > Clever** — Code dễ đọc hơn code thông minh
+- **Mark shortcuts** — Mọi simplification đều có `ponytail:` comment kèm ceiling và upgrade path
 
 ---
 

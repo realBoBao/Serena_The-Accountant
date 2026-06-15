@@ -4,7 +4,6 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
     "start": "node gateway.js",
     "dev": "concurrently -c \"cyan,magenta,yellow,green\" -n \"BOT,SERVER,CRON,WATCH\" \"npm run discord:bot\" \"npm run api\" \"npm run schedule\" \"npm run watch:library\"",
     "pipeline": "node pipeline_report_v2.js \"beginner\"",
@@ -30,6 +29,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@google-cloud/bigquery": "^8.3.1",
     "@google/genai": "^2.8.0",
     "@langchain/core": "^1.1.48",
     "@langchain/google-genai": "^2.1.31",
