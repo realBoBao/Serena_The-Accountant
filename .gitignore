@@ -40,3 +40,8 @@ coverage/
 *.tmp
 *.temp
 /tmp/
+
+# Large files
+models/*.gguf
+models/*.bin
+models/*.safetensors

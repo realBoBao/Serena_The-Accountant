@@ -117,11 +117,19 @@ async function runMemoryConsolidation() {
 
 // ── Pipeline lock để tránh chạy đồng thời ──
 let _pipelineRunning = false;
+let _lastPipelineRun = 0; // timestamp of last run
+const MIN_RUN_INTERVAL = 30 * 60 * 1000; // 30 minutes minimum between runs
 
 async function runPipeline() {
   // Nếu pipeline đang chạy → bỏ qua
   if (_pipelineRunning) {
     console.log('[scheduler] Pipeline đang chạy, bỏ qua lần này');
+    return;
+  }
+  // Nếu chạy gần đây (< 30 phút) → bỏ qua (tránh duplicate)
+  if (Date.now() - _lastPipelineRun < MIN_RUN_INTERVAL) {
+    const minsAgo = Math.round((Date.now() - _lastPipelineRun) / 60000);
+    console.log(`[scheduler] Pipeline chạy ${minsAgo} phút trước, bỏ qua`);
     return;
   }
 
@@ -133,6 +141,7 @@ async function runPipeline() {
   console.log('[scheduler] Command:', 'node', args.join(' '));
 
   _pipelineRunning = true;
+  _lastPipelineRun = Date.now();
 
   const child = spawn('node', args, { stdio: 'inherit' });
 
