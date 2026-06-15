@@ -525,6 +525,10 @@ route('GET', '/service-worker.js', (req, res) => {
   serveStatic(res, 'service-worker.js', 'application/javascript');
 }, { public: true });
 
+// ── API Documentation Page ──
+route('GET', '/docs', (req, res) => {
+  serveStatic(res, 'api-docs.html', 'text/html');
+}, { public: true });
 
 // Serve videos from public/videos/
 route('GET', '/videos/:id', (req, res, params) => {
