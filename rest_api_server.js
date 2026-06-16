@@ -816,10 +816,8 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`[REST API] Server listening on http://localhost:${PORT}`);
-  console.log(`[REST API] Health check: http://localhost:${PORT}/api/health`);
-  const keyStatus = !API_KEY ? '⚠️  MISSING (set REST_API_KEY in .env)' : (API_KEY === 'change-me-in-production' ? '⚠️  DEFAULT (set REST_API_KEY in .env)' : '✅ Custom');
-  console.log(`[REST API] API Key: ${keyStatus}`);
+  const keyStatus = !API_KEY ? 'missing' : (API_KEY === 'change-me-in-production' ? 'default' : 'custom');
+  logInfo('REST API', 'server listening', { port: PORT, api_key_status: keyStatus });
 });
 
 // Graceful shutdown — close server, DBs, flush caches

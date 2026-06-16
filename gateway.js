@@ -381,7 +381,6 @@ async function main() {
   startHealthCheck();
 
   logInfo('Gateway', 'starting services', { count: SERVICES.length });
-  console.log();
   for (const svc of SERVICES) startService(svc);
 
   setTimeout(() => {
