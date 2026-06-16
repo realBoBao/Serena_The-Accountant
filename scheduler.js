@@ -110,6 +110,7 @@ async function runMemoryConsolidation() {
     await archiveOldMemories(30);
     console.log('[scheduler] Memory consolidation completed');
     await saveLastRun('memory');
+      eventBus.emit('memory:complete', { topic: 'memory', ts: new Date().toISOString() });
       // Tier 4: Invalidate cache after memory consolidation
       try {
         const { default: SemanticCache } = await import('./lib/semantic_cache.js');
@@ -160,6 +161,7 @@ async function runPipeline() {
     if (signal) {
       console.log(`[scheduler] Pipeline process terminated with signal ${signal}`);
       await saveLastRun('pipeline');
+      eventBus.emit('pipeline:complete', { topic: 'pipeline', ts: new Date().toISOString() });
       // Tier 4: Invalidate stale cache entries after pipeline update
       try {
         const { default: SemanticCache } = await import('./lib/semantic_cache.js');
@@ -193,6 +195,7 @@ async function runBackup() {
     const result = await backupModule.runBackup();
     console.log(`[scheduler] Backup completed: ${result.backupName}`);
     await saveLastRun('backup');
+      eventBus.emit('backup:complete', { topic: 'backup', ts: new Date().toISOString() });
   } catch (err) {
     console.error('[scheduler] Backup failed:', err?.message || err);
   }

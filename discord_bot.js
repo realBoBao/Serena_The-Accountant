@@ -379,6 +379,27 @@ client.on(Events.MessageCreate, async (message) => {
   try {
     if (message.author.bot) return;
 
+    // ── Tier 1: Idempotency check — chặn duplicate requests ──
+    try {
+      const { createKey, check, markProcessing, markDone } = await import('./lib/idempotency.js');
+      const msgKey = createKey(`${message.author.id}:${message.content}`);
+      const idemCheck = check(msgKey);
+      if (idemCheck.cached) {
+        if (idemCheck.processing) {
+          logger.debug(`[Idempotency] Duplicate request from ${message.author.id}, still processing`);
+          return; // Đang xử lý, bỏ qua
+        }
+        if (idemCheck.result) {
+          logger.debug(`[Idempotency] Returning cached result for ${message.author.id}`);
+          await message.reply(idemCheck.result.answer || idemCheck.result);
+          return;
+        }
+      }
+      markProcessing(msgKey);
+      // Store key để markDone sau khi xử lý xong
+      message._idempotencyKey = msgKey;
+    } catch { /* idempotency optional */ }
+
     // Token Bucket rate limit
     if (!checkTokenBucket(message.author.id)) {
       return; // Silent drop — bucket rỗng
@@ -2235,46 +2256,58 @@ client.on(Events.MessageCreate, async (message) => {
       content: 'Da co loi khi xu ly cau hoi. Vui long thu lai sau.',
       allowedMentions: { parse: [] },
     });
+    // Mark idempotency done (with error)
+    try {
+      const { markDone } = await import('./lib/idempotency.js');
+      if (message._idempotencyKey) markDone(message._idempotencyKey, { answer: '❌ Lỗi xử lý' });
+    } catch { /* ignore */ }
+    return;
   }
-});
 
-// ── !plugins command ──
-if (content === '!plugins') {
+  // Mark idempotency done (success)
   try {
-    const { PluginLoader } = await import('./lib/plugin_loader.js');
-    const plugins = PluginLoader.list();
-    if (plugins.length === 0) {
-      await message.reply('Không có plugin nào đang chạy.');
-    } else {
-      const lines = plugins.map(p =>
-        `**${p.name}** v${p.version} — intents: ${p.intents.join(', ')}\n` +
-        `  permissions: \`${p.permissions.join(', ')}\``
-      ).join('\n\n');
-      await message.reply({
-        embeds: [{ title: `Loaded plugins (${plugins.length})`, description: lines }],
-      });
-    }
-  } catch (err) {
-    await message.reply('Lỗi khi lấy danh sách plugins: ' + err.message);
-  }
-}
+    const { markDone } = await import('./lib/idempotency.js');
+    if (message._idempotencyKey) markDone(message._idempotencyKey, { answer: '✅ Đã xử lý' });
+  } catch { /* ignore */ }
 
-// ── !plugin unload <name> command (admin only) ──
-if (content.startsWith('!plugin unload ')) {
-  const adminIds = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',') : [];
-  if (!adminIds.includes(message.author.id)) {
-    await message.reply('❌ Cần quyền admin để unload plugin.');
-  } else {
-    const name = content.slice(16).trim();
+  // ── !plugins command ──
+  if (content === '!plugins') {
     try {
       const { PluginLoader } = await import('./lib/plugin_loader.js');
-      const ok = await PluginLoader.unload(name);
-      await message.reply(ok ? `✅ Đã unload plugin "${name}"` : `❌ Không tìm thấy plugin "${name}"`);
+      const plugins = PluginLoader.list();
+      if (plugins.length === 0) {
+        await message.reply('Không có plugin nào đang chạy.');
+      } else {
+        const lines = plugins.map(p =>
+          `**${p.name}** v${p.version} — intents: ${p.intents.join(', ')}\n` +
+          `  permissions: \`${p.permissions.join(', ')}\``
+        ).join('\n\n');
+        await message.reply({
+          embeds: [{ title: `Loaded plugins (${plugins.length})`, description: lines }],
+        });
+      }
     } catch (err) {
-      await message.reply('Lỗi khi unload: ' + err.message);
+      await message.reply('Lỗi khi lấy danh sách plugins: ' + err.message);
     }
   }
-}
+
+  // ── !plugin unload <name> command (admin only) ──
+  if (content.startsWith('!plugin unload ')) {
+    const adminIds = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',') : [];
+    if (!adminIds.includes(message.author.id)) {
+      await message.reply('❌ Cần quyền admin để unload plugin.');
+    } else {
+      const name = content.slice(16).trim();
+      try {
+        const { PluginLoader } = await import('./lib/plugin_loader.js');
+        const ok = await PluginLoader.unload(name);
+        await message.reply(ok ? `✅ Đã unload plugin "${name}"` : `❌ Không tìm thấy plugin "${name}"`);
+      } catch (err) {
+        await message.reply('Lỗi khi unload: ' + err.message);
+      }
+    }
+  }
+});
 
 async function shutdown(signal) {
   console.log(`Received ${signal}. Shutting down Discord bot...`);

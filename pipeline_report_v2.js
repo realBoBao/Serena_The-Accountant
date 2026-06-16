@@ -251,59 +251,84 @@ async function youtubeSearchVideos(topic, maxResults = YOUTUBE_MAX_RESULTS, minV
 }
 
 async function redditSearch(topic, maxResults = 5){
-  const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(topic)}&sort=relevance&t=all&limit=${maxResults}`;
-  const res = await fetchWithRetry(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'application/json',
-    },
-  });
-  if (res.status === 403) {
-    console.warn('[Reddit] 403 Forbidden — Reddit may be blocking automated requests. Returning empty results.');
-    return [];
-  }
-  if(!res.ok) throw new Error(`Reddit search ${res.status}`);
-  const j = await res.json();
-  return (j.data?.children || []).map((item) => ({
-    id: item.data.id,
-    title: item.data.title,
-    subreddit: item.data.subreddit,
-    selftext: item.data.selftext || '',
-    score: item.data.score || 0,
-    url: `https://www.reddit.com${item.data.permalink}`,
-  })).filter((post) => post.title || post.selftext);
+  return retry(
+    () => hedge(
+      async (signal) => {
+        const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(topic)}&sort=relevance&t=all&limit=${maxResults}`;
+        const res = await fetchWithRetry(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+          },
+          signal,
+        });
+        if (res.status === 403) {
+          console.warn('[Reddit] 403 Forbidden — Reddit may be blocking automated requests. Returning empty results.');
+          return [];
+        }
+        if (!res.ok) throw new Error(`Reddit search ${res.status}`);
+        const j = await res.json();
+        return (j.data?.children || []).map((item) => ({
+          id: item.data.id,
+          title: item.data.title,
+          subreddit: item.data.subreddit,
+          selftext: item.data.selftext || '',
+          score: item.data.score || 0,
+          url: `https://www.reddit.com${item.data.permalink}`,
+        })).filter((post) => post.title || post.selftext);
+      },
+      { hedgeDelay: 1500, timeout: 8000 }
+    ),
+    { maxRetries: 2, baseDelay: 1000 }
+  );
 }
 
 async function stackOverflowSearch(topic, maxResults = 5){
-  const url = `https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q=${encodeURIComponent(topic)}&site=stackoverflow&pagesize=${maxResults}&filter=withbody`;
-  const res = await fetchWithRetry(url);
-  if(!res.ok) throw new Error(`StackOverflow search ${res.status}`);
-  const j = await res.json();
-  return (j.items || []).map((item) => ({
-    question_id: item.question_id,
-    title: item.title,
-    body: item.body || '',
-    link: item.link,
-    score: item.score || 0,
-    tags: item.tags || [],
-    accepted_answer_id: item.accepted_answer_id || null,
-  })).filter((q) => q.title || q.body);
+  return retry(
+    () => hedge(
+      async (signal) => {
+        const url = `https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q=${encodeURIComponent(topic)}&site=stackoverflow&pagesize=${maxResults}&filter=withbody`;
+        const res = await fetchWithRetry(url, { signal });
+        if (!res.ok) throw new Error(`StackOverflow search ${res.status}`);
+        const j = await res.json();
+        return (j.items || []).map((item) => ({
+          question_id: item.question_id,
+          title: item.title,
+          body: item.body || '',
+          link: item.link,
+          score: item.score || 0,
+          tags: item.tags || [],
+          accepted_answer_id: item.accepted_answer_id || null,
+        })).filter((q) => q.title || q.body);
+      },
+      { hedgeDelay: 1500, timeout: 8000 }
+    ),
+    { maxRetries: 2, baseDelay: 1000 }
+  );
 }
 
 async function hackerNewsSearch(topic, maxResults = 5){
-  const url = `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(topic)}&tags=story&hitsPerPage=${maxResults}`;
-  const res = await fetchWithRetry(url);
-  if(!res.ok) throw new Error(`Hacker News search ${res.status}`);
-  const j = await res.json();
-  return (j.hits || []).map((hit) => ({
-    objectID: hit.objectID,
-    title: hit.title || hit.story_title || 'Hacker News Story',
-    url: hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`,
-    author: hit.author,
-    points: hit.points || 0,
-    created_at: hit.created_at,
-    story_text: hit.story_text || '',
-  })).filter((story) => story.title);
+  return retry(
+    () => hedge(
+      async (signal) => {
+        const url = `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(topic)}&tags=story&hitsPerPage=${maxResults}`;
+        const res = await fetchWithRetry(url, { signal });
+        if (!res.ok) throw new Error(`Hacker News search ${res.status}`);
+        const j = await res.json();
+        return (j.hits || []).map((hit) => ({
+          objectID: hit.objectID,
+          title: hit.title || hit.story_title || 'Hacker News Story',
+          url: hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`,
+          author: hit.author,
+          points: hit.points || 0,
+          created_at: hit.created_at,
+          story_text: hit.story_text || '',
+        })).filter((story) => story.title);
+      },
+      { hedgeDelay: 1500, timeout: 8000 }
+    ),
+    { maxRetries: 2, baseDelay: 1000 }
+  );
 }
 
 async function analyzeWebItemAndUpsert(itemKey, metadata, text, category = 'Backend'){
@@ -341,7 +366,10 @@ async function analyzeWebItemAndUpsert(itemKey, metadata, text, category = 'Back
 }
 
 async function arxivSearch(topic, maxResults = 3){
-  // Tech keywords → chỉ tìm trong CS/ML categories
+  return retry(
+    () => hedge(
+      async (signal) => {
+        // Tech keywords → chỉ tìm trong CS/ML categories
   const TECH_SIGNALS = ['infrastructure', 'kubernetes', 'docker', 'deployment', 'microservice',
     'devops', 'terraform', 'serverless', 'distributed', 'database', 'algorithm',
     'machine learning', 'neural', 'compiler', 'operating system', 'cloud native',
@@ -403,6 +431,11 @@ async function arxivSearch(topic, maxResults = 3){
       link: idMatch?.[1]?.trim() || null,
     };
   }).filter(Boolean).slice(0, maxResults); // filter null + limit
+      },
+      { hedgeDelay: 2000, timeout: 10000 }
+    ),
+    { maxRetries: 2, baseDelay: 2000 }
+  );
 }
 
 async function fetchArxivPaperAndAnalyze(paper){
@@ -515,18 +548,20 @@ async function run(topic = null, isForce = false){
 
   // Facebook/Tavily web search — tìm social media posts về topic
   async function facebookWebSearch(topic, maxResults = 3) {
-    const tavilyKey = process.env.TAVILY_API_KEY;
-    if (!tavilyKey) {
-      console.log('[search] Facebook/Tavily: No TAVILY_API_KEY, skipping');
-      return [];
-    }
-    try {
-      const { tavily } = await import('@tavily/core');
-      const client = tavily({ apiKey: tavilyKey });
-      
-      // Search với query bao gồm "facebook" để tìm posts từ Facebook
-      const socialQuery = `${topic} (facebook OR twitter OR linkedin OR reddit)`;
-      const result = await client.search(socialQuery, {
+    return retry(
+      () => hedge(
+        async (signal) => {
+          const tavilyKey = process.env.TAVILY_API_KEY;
+          if (!tavilyKey) {
+            console.log('[search] Facebook/Tavily: No TAVILY_API_KEY, skipping');
+            return [];
+          }
+          const { tavily } = await import('@tavily/core');
+          const client = tavily({ apiKey: tavilyKey });
+
+          // Search với query bao gồm "facebook" để tìm posts từ Facebook
+          const socialQuery = `${topic} (facebook OR twitter OR linkedin OR reddit)`;
+          const result = await client.search(socialQuery, {
         maxResults: maxResults * 3, // Lấy nhiều hơn để filter
         includeAnswer: false,
         searchDepth: 'basic',
@@ -579,12 +614,17 @@ async function run(topic = null, isForce = false){
         }));
       }
       
-      return items;
-    } catch (err) {
-      console.warn('[search] Facebook/Tavily search failed:', err?.message || err);
-      return [];
-    }
-  }
+          return items;
+        } catch (err) {
+          console.warn('[search] Facebook/Tavily search failed:', err?.message || err);
+          return [];
+        }
+      },
+      { hedgeDelay: 1500, timeout: 8000 }
+    ),
+    { maxRetries: 2, baseDelay: 1000 }
+  );
+}
 
   // // ── Google Custom Search (broad web search, up to 10 results per query) ──
   // async function googleSearch(topic, maxResults = 10) {
