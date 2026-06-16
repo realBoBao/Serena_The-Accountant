@@ -1,7 +1,7 @@
 /**
  * Memory Decay & Consolidation Tests — Tier 3
  */
-import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, test, expect } from '@jest/globals';
 import { memoryDecay, ebbinghausRetention, DEFAULT_HALF_LIFE } from '../lib/memory_decay.js';
 
 describe('Memory Decay — ebbinghausRetention', () => {
@@ -81,28 +81,28 @@ describe('Memory Decay — decayValue', () => {
 });
 
 describe('Memory Decay — getProfileFreshness', () => {
-  test('returns null for unknown user', () => {
-    const freshness = memoryDecay.getProfileFreshness('nonexistent_user');
+  test('returns null for unknown user', async () => {
+    const freshness = await memoryDecay.getProfileFreshness('nonexistent_user');
     expect(freshness).toBeNull();
   });
 });
 
 describe('Memory Decay — getDecayStats', () => {
-  test('returns empty array for unknown user', () => {
-    const stats = memoryDecay.getDecayStats('nonexistent_user');
+  test('returns empty array for unknown user', async () => {
+    const stats = await memoryDecay.getDecayStats('nonexistent_user');
     expect(stats).toEqual([]);
   });
 });
 
 describe('Memory Decay — cleanup', () => {
-  test('does not throw', () => {
-    expect(() => memoryDecay.cleanup(0)).not.toThrow();
+  test('does not throw', async () => {
+    await expect(memoryDecay.cleanup(0)).resolves.not.toThrow();
   });
 });
 
 describe('Memory Decay — runDailyDecay', () => {
-  test('returns usersProcessed and totalChanges', () => {
-    const result = memoryDecay.runDailyDecay();
+  test('returns usersProcessed and totalChanges', async () => {
+    const result = await memoryDecay.runDailyDecay();
     expect(result).toHaveProperty('usersProcessed');
     expect(result).toHaveProperty('totalChanges');
     expect(typeof result.usersProcessed).toBe('number');

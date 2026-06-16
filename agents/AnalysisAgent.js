@@ -4,9 +4,13 @@
  * Tích hợp Bloom Filter để tránh phân tích URL trùng lặp.
  * Khi phân tích hàng chục ngàn URL, Bloom Filter giúp kiểm tra
  * "URL này đã phân tích chưa?" trong O(1) với RAM cực nhỏ.
+ *
+ * Web scraping: Local Firecrawl (mozilla/readability + turndown)
+ * $0 API cost. No external API keys needed.
  */
 
 import { BloomFilter } from '../lib/bloom_filter.js';
+import { scrapeUrl } from '../lib/web_scraper.js';
 
 // Singleton Bloom Filter cho URL deduplication
 // Dự kiến 10M URL, false positive rate 1% → ~12MB RAM
@@ -55,16 +59,32 @@ export async function analyzeUrl(url, options = {}) {
     }
   }
 
-  // Phân tích URL mới
+  // Phân tích URL mới — scrape web content locally
+  const urlType = detectUrlType(url);
+  let content = null;
+  let title = url;
+
+  if (urlType === 'web') {
+    // Use Local Firecrawl for generic web pages
+    content = await scrapeUrl(url);
+    if (content) {
+      // Extract title from markdown (# Title)
+      const titleMatch = content.match(/^#\s+(.+)/m);
+      if (titleMatch) title = titleMatch[1].trim();
+    }
+  }
+  // For github/youtube/arxiv, keep existing behavior (API-based)
+
   const result = {
     url,
-    type: detectUrlType(url),
-    title: url,
-    summary: `Analysis for ${url}`,
+    type: urlType,
+    title,
+    summary: content ? content.slice(0, 500) : `Analysis for ${url}`,
+    content,       // Full markdown content (for RAG pipeline)
     analyzedAt: new Date().toISOString(),
   };
 
-  console.log(`[AnalysisAgent] New URL analyzed: ${url} (${result.type})`);
+  console.log(`[AnalysisAgent] New URL analyzed: ${url} (${urlType})${content ? ` → ${content.length} chars` : ''}`);
   return result;
 }
 

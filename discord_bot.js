@@ -92,8 +92,8 @@ const _outboundTracker = {
    */
   track(userId, url, category = 'unknown', messageId = null) {
     try {
-      import('./lib/implicit_feedback.js').then(({ implicitFeedback }) => {
-        const linkId = implicitFeedback.trackOutbound(userId, { url, category, messageId });
+      import('./lib/implicit_feedback.js').then(async ({ implicitFeedback }) => {
+        const linkId = await implicitFeedback.trackOutbound(userId, { url, category, messageId });
         this._pending.set(userId, { linkId, sentAt: Date.now(), category });
       }).catch(() => {});
     } catch { /* non-critical */ }
@@ -445,12 +445,11 @@ client.on(Events.MessageCreate, async (message) => {
     // ── 0a. Implicit Feedback: Record dwell time from previous outbound ──
     try {
       const { implicitFeedback } = await import('./lib/implicit_feedback.js');
-      // Find the most recent outbound link sent to this user and record dwell time
-      const userLinks = implicitFeedback._getRecentUnreplied(message.author.id);
+      const userLinks = await implicitFeedback._getRecentUnreplied(message.author.id);
       if (userLinks && userLinks.length > 0) {
         const lastLink = userLinks[userLinks.length - 1];
         const dwellMs = Date.now() - new Date(lastLink.sent_at).getTime();
-        implicitFeedback.recordDwellTime(lastLink.id, message.author.id, dwellMs);
+        await implicitFeedback.recordDwellTime(lastLink.id, message.author.id, dwellMs);
       }
     } catch { /* implicit feedback non-critical */ }
 
@@ -461,7 +460,7 @@ client.on(Events.MessageCreate, async (message) => {
         hour: new Date().getHours(),
         messageLength: message.content.length,
       });
-      moodState.recordState(message.author.id, moodResult);
+      await moodState.recordState(message.author.id, moodResult);
     } catch { /* mood analysis non-critical */ }
 
     // ── 0. Socratic Mode: Kiểm tra session đang active ──
