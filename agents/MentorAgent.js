@@ -16,6 +16,8 @@ import { executeCode } from '../lib/code_sandbox.js';
 import { invokeLlm } from '../lib/llm.js';
 import { HumanMessage } from '@langchain/core/messages';
 import { getLogger } from '../lib/logger.js';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import {
   findUserCodeSnippets,
   generateChallenge,
@@ -24,8 +26,39 @@ import {
   getSession,
   updateSession,
 } from '../lib/shadow_review.js';
+import { buildXmlPrompt } from '../lib/prompt_xml.js';
 
 const logger = getLogger('MentorAgent');
+
+// ── Tier 1: Clean Code Standards (ryanmcdermott/clean-code-javascript) ──
+let _cleanCodeRules = null;
+function getCleanCodeRules() {
+  if (_cleanCodeRules) return _cleanCodeRules;
+  try {
+    _cleanCodeRules = readFileSync(resolve('./data/clean-code-rules.md'), 'utf8');
+  } catch {
+    _cleanCodeRules = ''; // Fallback if file not found
+  }
+  return _cleanCodeRules;
+}
+
+// ── Enhanced system prompt with Clean Code standards ──
+function buildMentorSystemPrompt() {
+  return buildXmlPrompt({
+    system: `Bạn là Senior Backend Developer nghiêm khắc. Bạn LUÔN trả lời bằng tiếng Việt. Bạn chấm code theo chuẩn Clean Code công nghiệp.`,
+    context: `<clean_code_rules>\n${getCleanCodeRules()}\n</clean_code_rules>`,
+    instructions: `Khi chấm code, bạn PHẢI:
+1. Kiểm tra tuân thủ Clean Code rules (đặt tên, SOLID, DRY, KISS)
+2. Chấm điểm theo thang 1-10 cho: Correctness, Readability, Performance, Maintainability
+3. Đưa ra gợi ý cải tiến cụ thể (không chung chung)
+4. Nếu code vi phạm nghiêm trọng → yêu cầu viết lại
+5. Nếu code tốt → khen ngợi và đề xuất thử thách khó hơn`,
+    constraints: `KHÔNG bao giờ viết đáp án thay user
+KHÔNG chấp nhận code vi phạm SOLID principles
+LUÔN dẫn dắt user tự tìm ra câu trả lời (phương pháp Socratic)`,
+    output: '[Đánh giá chi tiếm theo từng tiêu chí Clean Code, điểm số, và gợi ý cải tiến]',
+  });
+}
 
 // ── Shadow Review Flow ──
 
@@ -56,7 +89,7 @@ export async function startShadowReview(userId, level = 1) {
     level,
     async (prompt) => {
       const raw = await invokeLlm([
-        new HumanMessage('You are a strict Senior Backend Developer. Always respond in Vietnamese.'),
+        new HumanMessage(buildMentorSystemPrompt()),
         new HumanMessage(prompt),
       ], 'MentorChallenge');
       return raw;
@@ -135,7 +168,7 @@ export async function submitReviewAnswer(userId, sessionId, userCode, language =
     sandboxResult,
     async (prompt) => {
       const raw = await invokeLlm([
-        new HumanMessage('You are a strict Senior Backend Developer. Always respond in Vietnamese.'),
+        new HumanMessage(buildMentorSystemPrompt()),
         new HumanMessage(prompt),
       ], 'MentorEval');
       return raw;
@@ -224,7 +257,7 @@ Hint phải ngắn gọn, đúng trọng tâm. Tiếng Việt.`;
 
   try {
     const hint = await invokeLlm([
-      new HumanMessage('You are a helpful Senior Developer mentor. Always respond in Vietnamese.'),
+      new HumanMessage(buildMentorSystemPrompt()),
       new HumanMessage(hintPrompt),
     ], 'MentorHint');
 

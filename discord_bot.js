@@ -463,6 +463,28 @@ client.on(Events.MessageCreate, async (message) => {
       await moodState.recordState(message.author.id, moodResult);
     } catch { /* mood analysis non-critical */ }
 
+    // ── 0a. Voice Study Mode commands ──
+    if (content === '!voice study' || content === '!voice bắt đầu học') {
+      try {
+        const { setUserStudyState } = await import('./agents/VoiceAgent.js');
+        setUserStudyState(message.author.id, true);
+        await message.reply('📚 **Chế độ học đã bật!** Tôi sẽ im lặng và chỉ lên tiếng khi bạn gọi "Serena". Chúc bạn học tối! 🎯');
+      } catch (err) {
+        await message.reply('❌ Lỗi: ' + err.message);
+      }
+      return;
+    }
+    if (content === '!voice stop' || content === '!voice học xong') {
+      try {
+        const { setUserStudyState } = await import('./agents/VoiceAgent.js');
+        setUserStudyState(message.author.id, false);
+        await message.reply('🎉 **Chế độ học đã tắt!** Tôi có thể trò chuyện bình thường rồi.');
+      } catch (err) {
+        await message.reply('❌ Lỗi: ' + err.message);
+      }
+      return;
+    }
+
     // ── 0. Socratic Mode: Kiểm tra session đang active ──
     const activeSocratic = await getSocraticSession(message.author.id);
     if (activeSocratic) {
@@ -565,12 +587,18 @@ client.on(Events.MessageCreate, async (message) => {
           '`!memory <nội dung>` — Lưu trí nhớ\n' +
           '`!f1stats` — Xem F1 Score Dashboard\n' +
           '`!path <topic>` — Tạo lộ trình học từ Knowledge Graph\n\n' +
+          '**🎙️ Voice & VTuber:**\n' +
+          '`!voice` + audio — Transcribe giọng nói (whisper.cpp)\n' +
+          '`!voice study` — Bật chế độ học (bot im lặng, chỉ nghe "Serena")\n' +
+          '`!voice stop` — Tắt chế độ học\n' +
+          'Truy cập `/pngtuber` trên tablet/phone để xem avatar\n\n' +
           '**⚙️ Hệ thống:**\n' +
           '`!schedule` — Đồng bộ thời khóa biểu\n' +
           '`!plugins` — Xem danh sách plugins\n' +
           '`!plugin unload <name>` — Unload plugin (admin)\n' +
           '`!help` — Hiện danh sách lệnh này\n\n' +
-          '**📊 Chất lượng:** `!f1stats` | **🔒 Bảo mật:** `!audit` | **🧠 Học tập:** `!quiz` `!review` `!learn`',
+          '**📊 Chất lượng:** `!f1stats` | **🔒 Bảo mật:** `!audit` | **🧠 Học tập:** `!quiz` `!review` `!learn`\n\n' +
+          '**🤖 Serena** — AI Robot Girl Companion | Open Source | MIT License',
         allowedMentions: { parse: [], repliedUser: false },
       });
     }

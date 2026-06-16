@@ -1,7 +1,22 @@
-# My AI Brain — Multi-Agent AI System
+# My AI Brain — Serena, AI Robot Girl Companion
 
 > Hệ thống AI đa tác nhân tự học, tự tiến hóa, tự bảo mật.
 > **Cloud Run Ready | PM2 Production | Ponytail Optimized**
+> **327 tests PASS | 20 Agents | 7-tier RAG | Plugin System | VTuber**
+
+---
+
+## 🤖 Serena — AI Robot Girl
+
+Serena không chỉ là một chatbot — cô ấy là người bạn đồng hành ảo:
+
+- **🎙️ Voice Chat** — Nói chuyện qua Discord voice channel (whisper.cpp + VAD)
+- **📚 Study Mode** — "Serena, tôi bắt đầu học đây" → bot im lặng, chỉ lên tiếng khi gọi
+- **🖥️ VTuber Avatar** — PNGTuber hiển thị trên tablet/điện thoại (WebSocket)
+- **😊 Emotion Sync** — Avatar biểu cảm theo nội dung trò chuyện
+- **🧠 20 AI Agents** — RAG, Code, Debate, Socratic, Security, Voice, v.v.
+- **🔌 Plugin System** — Kernel module pattern, permission boundary
+- **⚡ Enterprise Optimizations** — Circuit breaker, idempotency, load shedding
 
 ---
 
@@ -167,24 +182,48 @@ node scheduler.js        # Cron jobs
 
 ## Discord Commands
 
+### 🧠 Học tập & Q&A
 ```
-!ask <câu hỏi>              → RAG-powered Q&A
+!ask <câu hỏi>              → RAG-powered Q&A (7-tier pipeline)
 !ask <câu hỏi> --deep       → Deep search (8 results, 5 web sources)
-!run <code>                 → Chạy code trong Sandbox
-!code <bài toán>            → Viết + chạy code tự động
-!debate <bài toán>          → Multi-agent debate
-!quiz                       → Flashcard quiz (FSRS)
-!answer <id> <ans>          → Review flashcard
-!review                     → Shadow Review (ôn code)
-!incident                   → Chaos Engineering
 !learn <url>                → Học từ URL/PDF
 !path <topic>               → Learning Path (DAG từ KG)
 !path <topic> --short       → Chỉ 5 bước tiếp theo
 !path <topic> --gaps        → Chỉ topic cần học
+!quiz                       → Flashcard quiz (FSRS spaced repetition)
+!answer <id> <ans>          → Review flashcard
 !f1stats                    → F1 Score Dashboard
-!profile                    → Hồ sơ học tập
+```
+
+### 💻 Code & Sandbox
+```
+!run <code>                 → Chạy code trong Sandbox (4-layer security)
+!code <bài toán>            → Viết + chạy code tự động (self-debug loop)
+!review                     → Shadow Review (ôn code cũ với MentorAgent)
+!debate <bài toán>          → Multi-agent debate (Coder vs Rag → Judge)
+!incident                   → Chaos Engineering (8 loại sự cố production)
+```
+
+### 🎙️ Voice & VTuber
+```
+!voice + audio              → Transcribe giọng nói (whisper.cpp)
+!voice study                → Bật chế độ học (bot im lẫn, chỉ nghe wake word)
+!voice stop                 → Tắt chế độ học
+```
+
+### 🔧 Hệ thống & Admin
+```
+!plugins                    → Xem danh sách plugins đang chạy
+!plugin unload <name>       → Unload plugin (admin only)
+!profile                    → Hồ sơ học tập (learning style, stats)
 !preferences                → Tùy chọn model/sources/learning
-!help                       → Danh sách lệnh
+!help                       → Danh sách lệnh này
+```
+
+### 📊 Monitoring
+```
+GET  /api/health                    → Health check
+GET  /pngtuber                      → PNGTuber avatar (mở trên tablet/phone)
 ```
 
 ### REST API Endpoints

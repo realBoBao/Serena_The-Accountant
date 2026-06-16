@@ -8,6 +8,7 @@
 import { ask as llmAsk } from '../lib/llm.js';
 import { getLogger } from '../lib/logger.js';
 import { HumanMessage } from '@langchain/core/messages';
+import { searchResources, getByCategory } from '../lib/devops_db.js';
 
 const logger = getLogger('PlannerAgent');
 
@@ -106,4 +107,34 @@ Trả về JSON:
   }
 }
 
-export default { createVisionFirstPlan, createPlan };
+/**
+ * Tier 1: Suggest $0 DevOps resources for a project.
+ * Queries devops_db (free-for-dev, open-source-alternatives) to find
+ * free alternatives to paid services.
+ *
+ * @param {string} requirement — e.g. "hosting", "database", "auth", "storage"
+ * @returns {Promise<{resources: Array, message: string}>}
+ */
+export async function suggestFreeResources(requirement) {
+  logger.info(`[PlannerAgent] Suggesting free resources for: ${requirement}`);
+
+  const resources = await searchResources(requirement, 5);
+
+  if (resources.length === 0) {
+    return {
+      resources: [],
+      message: `Không tìm thấy resource phù hợp cho "${requirement}". Thử từ khóa khác như: hosting, database, auth, storage, monitoring, email.`,
+    };
+  }
+
+  const lines = resources.map(r =>
+    `• **${[r.name]}** (${r.tier}) — ${r.description}${r.url ? `\n  🔗 ${r.url}` : ''}`
+  );
+
+  return {
+    resources,
+    message: `🆓 **Free resources cho "${requirement}":**\n\n${lines.join('\n\n')}`,
+  };
+}
+
+export default { createVisionFirstPlan, createPlan, suggestFreeResources };
