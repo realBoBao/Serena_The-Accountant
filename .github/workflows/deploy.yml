@@ -28,7 +28,6 @@ jobs:
           key: ${{ secrets.GCP_SSH_KEY }}
           port: ${{ secrets.GCP_SSH_PORT || '22' }}
           timeout: 120s
-          script_stop: true
           envs: GH_PAT
           script: |
             set -e
