@@ -419,24 +419,28 @@ client.on(Events.MessageCreate, async (message) => {
     const content = message.content;
 
     // ── Tier 1: Idempotency check — chặn duplicate requests ──
+    // Bypass cho lệnh nhanh (không cần cache vì chạy < 1s)
+    const isFastCommand = /^(?!help|voice|plugins|plugin unload|ping|status|uptime)/i.test(content);
     try {
-      const { createKey, check, markProcessing, markDone } = await import('./lib/idempotency.js');
-      const msgKey = createKey(`${message.author.id}:${message.content}`);
-      const idemCheck = check(msgKey);
-      if (idemCheck.cached) {
-        if (idemCheck.processing) {
-          logger.debug(`[Idempotency] Duplicate request from ${message.author.id}, still processing`);
-          return; // Đang xử lý, bỏ qua
+      if (isFastCommand) {
+        const { createKey, check, markProcessing, markDone } = await import('./lib/idempotency.js');
+        const msgKey = createKey(`${message.author.id}:${message.content}`);
+        const idemCheck = check(msgKey);
+        if (idemCheck.cached) {
+          if (idemCheck.processing) {
+            logger.debug(`[Idempotency] Duplicate request from ${message.author.id}, still processing`);
+            return; // Đang xử lý, bỏ qua
+          }
+          if (idemCheck.result) {
+            logger.debug(`[Idempotency] Returning cached result for ${message.author.id}`);
+            await message.reply(idemCheck.result.answer || idemCheck.result);
+            return;
+          }
         }
-        if (idemCheck.result) {
-          logger.debug(`[Idempotency] Returning cached result for ${message.author.id}`);
-          await message.reply(idemCheck.result.answer || idemCheck.result);
-          return;
-        }
+        markProcessing(msgKey);
+        // Store key để markDone sau khi xử lý xong
+        message._idempotencyKey = msgKey;
       }
-      markProcessing(msgKey);
-      // Store key để markDone sau khi xử lý xong
-      message._idempotencyKey = msgKey;
     } catch { /* idempotency optional */ }
 
     // Token Bucket rate limit

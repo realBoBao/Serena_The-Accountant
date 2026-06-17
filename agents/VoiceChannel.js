@@ -51,6 +51,21 @@ export async function joinChannel(channel) {
     });
 
     logger.info(`[Voice] Joined channel: ${channel.name} (${guildId})`);
+
+    // ── Phát âm thanh chào khi vào kênh (Google TTS) ──
+    try {
+      const ttsUrl = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=vi&client=tw-ob&q=Xin+chào,+Serena+đã+có+mặt';
+      const ttsRes = await fetch(ttsUrl);
+      if (ttsRes.ok) {
+        const audioBuffer = Buffer.from(await ttsRes.arrayBuffer());
+        const resource = createAudioResource(audioBuffer);
+        player.play(resource);
+        logger.info(`[Voice] Playing greeting in ${channel.name}`);
+      }
+    } catch (ttsErr) {
+      logger.debug(`[Voice] TTS greeting failed: ${ttsErr.message}`);
+    }
+
     return { success: true };
   } catch (err) {
     logger.error(`[Voice] Join failed: ${err.message}`);
