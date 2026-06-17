@@ -7,17 +7,18 @@ import {
   getStats,
   deleteFlashcard,
   clearAll,
+  closeDb,
   SPACED_INTERVALS,
 } from '../lib/flashcard_db.js';
 
 describe('Flashcard Database - Spaced Repetition', () => {
   beforeAll(async () => {
-    // Clear all flashcards before tests
     await clearAll();
   });
 
   afterAll(async () => {
     await clearAll();
+    await closeDb();
   });
 
   beforeEach(async () => {
