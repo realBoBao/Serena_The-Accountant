@@ -59,6 +59,14 @@ jobs:
             npm install --legacy-peer-deps --only-production 2>&1 | tail -10
             echo "📦 Installed $(ls node_modules | wc -l) packages"
 
+            # Rebuild native modules for current Node version (sqlite3 needs C++ compiler)
+            echo "🔧 Rebuilding native modules..."
+            if ! command -v g++ &> /dev/null; then
+              echo "📦 Installing build-essential..."
+              sudo apt-get update -qq && sudo apt-get install -y -qq build-essential python3
+            fi
+            npm rebuild 2>&1 | tail -5 || echo "⚠️ npm rebuild failed"
+
             # Restart PM2
             echo "🔄 Restarting PM2..."
             pm2 restart AI_Brain --update-env 2>/dev/null || pm2 start ecosystem.config.cjs
