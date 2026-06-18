@@ -66,6 +66,50 @@ const DEV_TOPICS = [
   'System design case studies for scalable platforms',
 ];
 
+// ── Topic Tracking: Tránh chạy duplicate topic trong ngày ──
+const TOPIC_HISTORY_FILE = path.resolve('./.topic_history.json');
+
+async function loadTopicHistory() {
+  try {
+    const data = await fs.readFile(TOPIC_HISTORY_FILE, 'utf8');
+    const history = JSON.parse(data);
+    // Chỉ giữ topics trong hôm nay
+    const today = new Date().toISOString().slice(0, 10);
+    return history[today] || [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveTopicHistory(topic) {
+  try {
+    let history = {};
+    try {
+      const data = await fs.readFile(TOPIC_HISTORY_FILE, 'utf8');
+      history = JSON.parse(data);
+    } catch { /* file not found */ }
+    const today = new Date().toISOString().slice(0, 10);
+    if (!history[today]) history[today] = [];
+    history[today].push({ topic, ts: new Date().toISOString() });
+    await fs.writeFile(TOPIC_HISTORY_FILE, JSON.stringify(history, null, 2), 'utf8');
+  } catch { /* ignore */ }
+}
+
+async function pickUniqueTopic() {
+  const history = await loadTopicHistory();
+  const available = DEV_TOPICS.filter(t => !history.includes(t));
+  // Nếu tất cả topics đã chạy → reset history
+  if (available.length === 0) {
+    console.log('[Pipeline] All topics ran today — resetting history');
+    const today = new Date().toISOString().slice(0, 10);
+    const history = {};
+    history[today] = [];
+    await fs.writeFile(TOPIC_HISTORY_FILE, JSON.stringify(history, null, 2), 'utf8');
+    return DEV_TOPICS[Math.floor(Math.random() * DEV_TOPICS.length)];
+  }
+  return available[Math.floor(Math.random() * available.length)];
+}
+
 
 
 
@@ -516,10 +560,23 @@ async function fetchVideoAndAnalyze(video){
 }
 
 async function run(topic = null, isForce = false){
-  const chosenTopic = topic && String(topic).trim() ? String(topic).trim() : DEV_TOPICS[Math.floor(Math.random() * DEV_TOPICS.length)];
+  // ── Chọn topic: ưu tiên từ env/args, nếu không thì pick unique từ history ──
+  let chosenTopic;
+  if (topic && String(topic).trim()) {
+    chosenTopic = String(topic).trim();
+  } else {
+    try {
+      chosenTopic = await pickUniqueTopic();
+    } catch {
+      chosenTopic = DEV_TOPICS[Math.floor(Math.random() * DEV_TOPICS.length)];
+    }
+  }
   if(!topic || !String(topic).trim()){
     console.log('No topic argument provided. Selected random topic:', chosenTopic);
   }
+
+  // ── Lưu topic vào history ──
+  await saveTopicHistory(chosenTopic);
 
   const allAnalyzedRepos = [];
   const allAnalyzedVideos = [];
