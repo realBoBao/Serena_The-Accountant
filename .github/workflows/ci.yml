@@ -7,7 +7,7 @@ on:
     branches: [main, master]
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
 
 jobs:
   # ── Job 1: Lint & Format ─────────────────────────────────
@@ -18,9 +18,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
-      - run: sudo apt-get update -qq && sudo apt-get install -y -qq build-essential python3
       - run: npm install --legacy-peer-deps
       - run: npx prettier --check "**/*.js" "**/*.json" "**/*.md" || true
       - run: npx eslint . --ext .js --max-warnings=50 || true
@@ -34,9 +33,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
-      - run: sudo apt-get update -qq && sudo apt-get install -y -qq build-essential python3
       - run: npm install --legacy-peer-deps
       - run: node --experimental-vm-modules node_modules/jest/bin/jest.js tests/socratic.test.js tests/incident_agent.test.js tests/shadow_review.test.js tests/mood_state.test.js tests/vector_collections.test.js tests/flashcard_generator.test.js tests/groq_provider.test.js tests/datalog_engine.test.js tests/vibe_coding_audit.test.js tests/privileged_agent.test.js tests/code_sandbox.test.js tests/sandbox_security.test.js --no-cache --no-coverage --silent
         env:
@@ -51,7 +49,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
       - run: npm install --legacy-peer-deps
       - name: Run npm audit
