@@ -22,6 +22,7 @@ import {
   setUserPreference,
   getUserPreference,
 } from '../lib/cross_model_learner.js';
+import { normalizeDomainCategory } from '../lib/query_quality.js';
 // Lazy imports for optional features (loaded on demand to reduce startup memory)
 
 // ── Fallback: Lấy random sources từ database khi LLM hỏng ──
@@ -576,13 +577,13 @@ async function getGraphEnhancedContext(query, localResults = []) {
   return '';
 }
 
-async function localRetrieval(query, biasTopic, queryEmbedding) {
+async function localRetrieval(query, biasTopic, queryEmbedding, category = null) {
   const { searchAcademic, searchSystem, searchDaily } = await import('../lib/vector_collections.js');
 
   const [academicResults, systemResults, dailyResults] = await Promise.allSettled([
-    searchAcademic(queryEmbedding, 6),
-    searchSystem(queryEmbedding, 4),
-    searchDaily(queryEmbedding, 4),
+    searchAcademic(queryEmbedding, 6, category),
+    searchSystem(queryEmbedding, 4, category),
+    searchDaily(queryEmbedding, 4, category),
   ]);
 
   const weightResults = (results, weight) => results.map((r) => ({ ...r, score: r.score * weight }));
@@ -610,12 +611,12 @@ async function localRetrieval(query, biasTopic, queryEmbedding) {
     .slice(0, maxResults);
 }
 
-async function hybridLocalRetrieval(query, biasTopic) {
+async function hybridLocalRetrieval(query, biasTopic, category = null) {
   // Dùng HyDE embedding nếu enabled, ngược lại dùng embedding trực tiếp
   const queryEmbedding = await hydeEmbedQuery(query);
 
   const [vectorResults, bm25Results] = await Promise.allSettled([
-    localRetrieval(query, biasTopic, queryEmbedding),
+    localRetrieval(query, biasTopic, queryEmbedding, category),
     searchBm25(query, maxResults + 2),
   ]);
 
@@ -1164,6 +1165,8 @@ export async function answerQuestion(query, options = {}) {
     } catch { /* quality gate optional */ }
   }
 
+  const retrievalCategory = normalizeDomainCategory(options._detectedDomain || null);
+
   // ── Tier 2: Speculative Execution — kiểm tra prefetch cache trước ──
   if (!options.skipCache && !options.isDeep && !options.bypassCache) {
     try {
@@ -1243,7 +1246,7 @@ export async function answerQuestion(query, options = {}) {
   };
 
   try {
-    const localResults = await hybridLocalRetrieval(cleanQuery, predictedTopic);
+    const localResults = await hybridLocalRetrieval(cleanQuery, predictedTopic, retrievalCategory);
 
     let graphContext = '';
     if (localResults.length > 0) {
@@ -1282,7 +1285,7 @@ export async function answerQuestion(query, options = {}) {
         // Each query runs the full pipeline: retrieve → synthesize → self-reflect
         // First one to PASS the gate wins — others are abandoned
         const racingTasks = queriesToRetry.map(async (expandedQuery, index) => {
-          const retryResults = await hybridLocalRetrieval(expandedQuery, predictedTopic);
+          const retryResults = await hybridLocalRetrieval(expandedQuery, predictedTopic, retrievalCategory);
           if (!retryResults.length) throw new Error('no_results');
 
           const retryContext = formatContext(retryResults);

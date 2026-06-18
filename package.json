@@ -33,7 +33,6 @@
   },
   "dependencies": {
     "@discordjs/voice": "^0.19.2",
-    "edge-tts": "^6.1.0",
     "@google-cloud/bigquery": "^8.3.1",
     "@google/genai": "^2.8.0",
     "@langchain/core": "^1.1.48",
@@ -47,6 +46,7 @@
     "discord.js": "^14.16.0",
     "dotenv": "^17.4.2",
     "duck-duck-scrape": "^2.2.7",
+    "edge-tts": "^1.0.1",
     "express": "^4.19.2",
     "jsdom": "^29.1.1",
     "node-cron": "^3.0.3",
@@ -66,6 +66,7 @@
     "concurrently": "^9.2.1",
     "eslint": "^9.39.4",
     "jest": "^29.7.0",
+    "jest-circus": "^30.4.2",
     "node-gyp": "^10.3.1",
     "prettier": "^3.8.3",
     "ts-jest": "^29.4.11"

@@ -589,10 +589,11 @@ client.on(Events.MessageCreate, async (message) => {
       try {
         const { orchestratorGuard } = await import('./lib/orchestrator_guard.js');
         const usage = orchestratorGuard.getAgentUsage();
-        if (usage.length === 0) {
+        if (usage.size === 0) {
           return message.reply('📊 Chưa có dữ liệu agent usage. Hãy dùng vài lệnh trước!');
         }
-        const lines = usage.map(([name, count]) => `• **${name}**: ${count} calls`);
+        const lines = [...usage.entries()].sort(([, a], [, b]) => b - a)
+          .map(([name, count]) => `• **${name}**: ${count} calls`);
         return message.reply({
           embeds: [{
             color: 0x7F77DD,
@@ -696,9 +697,11 @@ client.on(Events.MessageCreate, async (message) => {
         if (!query) {
           return message.reply('📋 Dùng: `!ask <câu hỏi>` hoặc `!ask <câu hỏi> --deep`');
         }
-        const { answerQuestion } = await import('./agents/RagAgent.js');
-        const ragResult = await answerQuestion(query, { userId: message.author.id });
-        await message.reply(ragResult.answer || ragResult.text || 'Không tìm thấy câu trả lời.');
+        const ragResult = await orchestratorGuard.routeWithGuard('RAG', {
+          query,
+          options: { userId: message.author.id },
+        }, message.author.id);
+        await message.reply(ragResult?.answer || ragResult?.text || ragResult?.result?.answer || ragResult?.result?.text || 'Không tìm thấy câu trả lời.');
       } catch (err) {
         await message.reply(`❌ Lỗi RAG: ${err?.message || err}`);
       }
