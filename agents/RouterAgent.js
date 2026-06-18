@@ -15,6 +15,7 @@ import { classifyIntentLocal, classifyIntentLlm } from '../lib/edge_router.js';
 import { info, warn } from '../lib/structured_logger.js';
 import { searchPointers, fetchPointerContent } from '../lib/lazy_knowledge.js';
 import { isEnabled, setEnabled, getAll as getAllFlags } from '../lib/feature_flags.js';
+import { detectPersona, shouldSkipRag, getPersonaSystemPrompt } from '../lib/persona_router.js';
 
 const logger = getLogger('RouterAgent');
 
@@ -105,6 +106,14 @@ const AGENT_REGISTRY = {
     enabled: true,
     cost: 'low',
   },
+  // ── Persona Agent (Tier 1: Lightweight, no RAG) ──
+  persona: {
+    name: 'PersonaAgent',
+    description: 'Lightweight persona responses — therapist, casual chat (no RAG)',
+    import: () => import('./PersonaAgent.js'),
+    enabled: true,
+    cost: 'low',
+  },
 
   // ── Shadow Agents (Tier 2: Dark Traffic) ──
   // Shadow agents chạy song song với primary khi SHADOW_MODE=true.
@@ -143,6 +152,9 @@ const INTENT_AGENT_MAP = {
   PLANNER: ['planner'],
   VISION_PLANNER: ['vision'],
   ANALYZE: ['analysis'],
+  // ── Persona Routing (Tier 1) ──
+  THERAPIST: ['persona'],
+  TECHNICAL: ['rag'],
 };
 
 // ── Shadow Launching Registry ──
@@ -223,6 +235,16 @@ class RouterAgent {
    */
   async route(intent, context = {}) {
     this._stats.totalRequests++;
+
+    // ── Tier 1: Persona Routing — Override intent nếu phát hiện THERAPIST ──
+    if (context.query && (intent === 'RAG' || intent === 'CHAT' || intent === 'MEMORY')) {
+      const personaResult = detectPersona(context.query);
+      if (personaResult.persona === 'THERAPIST' && personaResult.confidence > 0.8) {
+        logger.info(`[RouterAgent] Persona override: ${intent} → THERAPIST (${personaResult.confidence.toFixed(2)})`);
+        intent = 'THERAPIST';
+        context.persona = personaResult;
+      }
+    }
 
     const agentKeys = INTENT_AGENT_MAP[intent];
     if (!agentKeys || agentKeys.length === 0) {
@@ -416,6 +438,10 @@ class RouterAgent {
           maxRetries: context.maxRetries ?? 2,
           runTests: context.runTests !== false,
         });
+
+      // ── Persona Agent (Tier 1: Lightweight, no RAG) ──
+      case 'persona':
+        return await module.answerQuestion(context);
 
       default:
         throw new Error(`Unknown agent dispatch: ${agentKey}`);
