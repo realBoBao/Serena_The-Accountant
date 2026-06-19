@@ -566,6 +566,20 @@ if (!IS_CLOUD_RUN) {
     }
   }, { timezone: 'America/Los_Angeles' });
 
+  // ── Tier 3: Job Scraper — 6:00 AM PDT ──
+  const JOB_CRON = '0 6 * * *';
+  const jobTask = cron.schedule(JOB_CRON, async () => {
+    logger.info('[Scheduler] Job scraper triggered');
+    try {
+      const { runJobScraper } = await import('./cron/job_scraper.js');
+      const result = await runJobScraper();
+      logger.info(`[Scheduler] Job scraper: ${result.newJobs} new jobs found`);
+      await saveLastRun('jobs');
+    } catch (err) {
+      logger.error('[Scheduler] Job scraper error:', err?.message || err);
+    }
+  }, { timezone: 'America/Los_Angeles' });
+
   // ── Start all cron jobs ──
   task.start();
   memoryTask.start();
@@ -574,6 +588,7 @@ if (!IS_CLOUD_RUN) {
   graphTask.start();
   suggestionTask.start();
   rssTask.start();
+  jobTask.start();
 
   logger.info('[Scheduler] All node-cron jobs started');
 } // end if (!IS_CLOUD_RUN)

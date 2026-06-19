@@ -608,6 +608,49 @@ client.on(Events.MessageCreate, async (message) => {
       }
     }
 
+    // ── !draft command: Outreach Drafting (Tier 4) ──
+    if (content.startsWith('!draft ')) {
+      const input = content.slice(7).trim();
+      if (input.length < 50) {
+        return message.reply(
+          '📋 Paste nội dung JD hoặc recruiter profile vào sau `!draft`.\n' +
+          'Ví dụ: `!draft We are looking for a backend engineer with 2+ years...`'
+        );
+      }
+      try {
+        await message.channel.sendTyping();
+        const { OutreachDraftAgent } = await import('./agents/OutreachDraftAgent.js');
+        const agent = new OutreachDraftAgent();
+        const drafts = await agent.execute(input, message.author.id);
+
+        // Gửa qua DM để không spam channel chung
+        try {
+          const dm = await message.author.createDM();
+          await dm.send({
+            embeds: [{
+              color: 0x7F77DD,
+              title: '✉️ Outreach Drafts — Chọn 1 rồi copy sang LinkedIn/email',
+              description: drafts.slice(0, 4000),
+              footer: { text: 'Nhớ thay [NAME] và [COMPANY] trước khi gửi' },
+            }],
+          });
+          return message.reply('✅ Đã gửi 3 phiên bản qua DM.');
+        } catch {
+          // Fallback: gửa trong channel nếu không được DM
+          return message.reply({
+            embeds: [{
+              color: 0x7F77DD,
+              title: '✉️ Outreach Drafts',
+              description: drafts.slice(0, 4000),
+              footer: { text: 'Nhớ thay [NAME] và [COMPANY] trước khi gửi' },
+            }],
+          });
+        }
+      } catch (err) {
+        return message.reply(`❌ Lỗi: ${err?.message || err}`);
+      }
+    }
+
     // ── 0. Socratic Mode: Kiểm tra session đang active ──
     const activeSocratic = await getSocraticSession(message.author.id);
     if (activeSocratic) {
