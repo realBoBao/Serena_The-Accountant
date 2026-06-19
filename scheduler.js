@@ -4,6 +4,7 @@ import { addJob, JobType, QueueName } from './lib/task_queue.js';
 import { getLogger } from './lib/logger.js';
 import { writeJsonSafe, readJsonSafe, writeJsonWithBackup, cleanupStaleTempFiles } from './lib/safe_json.js';
 import { writeJsonAtomic } from './lib/atomic_write.js';
+import { checkRisk, sendRiskAlert } from './lib/behavioral_predictor.js';
 
 const logger = getLogger('Scheduler');
 const eventBus = globalThis.eventBus ?? null;
@@ -203,6 +204,17 @@ async function runPipeline({ respectCooldown = true } = {}) {
     } else {
       console.log(`[scheduler] Pipeline process exited with code ${code}`);
       await saveLastRun('pipeline');
+
+      // ── Tier 4: Behavioral Predictor — Check risk patterns ──
+      try {
+        const risks = checkRisk('pipeline', TOPIC_OVERRIDE || 'auto');
+        if (risks.length > 0) {
+          console.log(`[scheduler] ⚠️ Behavioral Predictor: ${risks.length} risk(s) detected`);
+          await sendRiskAlert(risks, 'scheduler_pipeline');
+        }
+      } catch (predictorErr) {
+        logger.debug('[scheduler] Behavioral Predictor skipped:', predictorErr?.message);
+      }
     }
   });
 
