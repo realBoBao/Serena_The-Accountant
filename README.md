@@ -104,6 +104,18 @@ SQLite Vector Store (domain-filtered) + BM25 + Knowledge Graph
 !interview end              → Kết thúc mock interview
 ```
 
+### Daily Algo Bot (Webhook)
+```
+8:00 AM daily                → Gửi bài thuật toán vào #daily-algo
+23:59 PM daily               → Gửi đáp án nếu chưa !done
+!done                        → Đánh dãu giải xong, skip đáp án
+```
+
+### Job Bot (Webhook)
+```
+Mỗi 6h                       → Scrape SimplifyJobs → gửi #job-alerts
+```
+
 ### Camera (Web UI)
 ```
 📷 Camera tab               → Nhận diện cảm xúc (demo mode)

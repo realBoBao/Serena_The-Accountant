@@ -583,9 +583,16 @@ client.on(Events.MessageCreate, async (message) => {
           '**💼 Career & Interview:**\n' +
           '`!draft <JD text>` — Soạn thảo outreach (3 versions)\n' +
           '`!interview start` — Mock interview với Staff Engineer\n' +
-          '`!interview end` — Kết thúc mock interview\n\n' +
+          '`!interview end` — Kết thúc mock interview\n' +
+          '`!done` — Đánh dãu giải xong bài Algo\n\n' +
           '**📷 Camera (Web UI):**\n' +
           'Nhấn tab 📷 để nhận diện cảm xúc (demo mode)\n\n' +
+          '**🤖 Daily Algo Bot:**\n' +
+          '8:00 AM — Gửi bài thuật toán vào #daily-algo\n' +
+          '23:59 PM — Gửi đáp án nếu chưa !done\n' +
+          '`!done` — Đánh dãu giải xong\n\n' +
+          '**💼 Job Bot:**\n' +
+          'Mỗi 6h — Scrape SimplifyJobs → gửi #job-alerts\n\n' +
           '**🤖 Serena** — AI Robot Girl Companion | MIT License',
         allowedMentions: { parse: [], repliedUser: false },
       });
