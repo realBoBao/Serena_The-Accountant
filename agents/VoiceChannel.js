@@ -13,7 +13,7 @@ import {
   entersState,
 } from '@discordjs/voice';
 import { getLogger } from '../lib/logger.js';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
