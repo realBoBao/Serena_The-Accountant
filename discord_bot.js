@@ -881,11 +881,13 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         // Add confidence badge
-        if (confidence) {
-          const confScore = Math.round((confidence.score || 0) * 100);
-          const confEmoji = confScore >= 80 ? '🟢' : confScore >= 50 ? '🟡' : '🔴';
-          reply += `\n\n${confEmoji} Độ tin cậy: ${confScore}% | 📡 Nguồn: ${source}`;
-        }
+        // For cache/prefetch hits → always show high confidence
+        // For RAG results → use scorer (may be low if no search results)
+        const isCacheHit = source === 'cache' || source === 'prefetch';
+        const confScore = isCacheHit ? 95 : Math.round((confidence?.score || 0) * 100);
+        const confEmoji = confScore >= 80 ? '🟢' : confScore >= 50 ? '🟡' : '🔴';
+        const confLabel = isCacheHit ? 'Cao' : (confScore >= 80 ? 'Cao' : confScore >= 50 ? 'Trung bình' : 'Thấp');
+        reply += `\n\n${confEmoji} Độ tin cậy: ${confLabel} (${confScore}%) | 📡 Nguồn: ${source}`;
 
         // Add feedback hint
         reply += '\n\n👍 Hữu ích | 👎 Không hữu ích';
