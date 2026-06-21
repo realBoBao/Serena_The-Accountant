@@ -432,6 +432,76 @@ client.on(Events.MessageCreate, async (message) => {
 
     const content = message.content;
 
+    // ── 0. Instant commands — bypass ALL middleware (rate limit, dedup, AI) ──
+    if (content === '!help' || content === '!help ') {
+      return message.channel.send({
+        content:
+          '📋 **Danh sách lệnh AI Brain v7.0:**\n\n' +
+          '**🔍 Hỏi đáp & Tìm kiếm:**\n' +
+          '`!ask <câu hỏi>` — Hỏi AI (RAG + Web Search)\n' +
+          '`!ask <câu hỏi> --deep` — Tìm kiếm sâu\n\n' +
+          '**💻 Code & Thuật toán:**\n' +
+          '`!run <code>` — Chạy code trong Sandbox\n' +
+          '`!code <bài toán>` — Viết + chạy code\n' +
+          '`!debate <bài toán>` — Tranh luận đa tác nhân\n' +
+          '`!cli <tool>` — Tìm lệnh CLI (0% hallucination)\n\n' +
+          '**📚 Học tập & Ôn tập:**\n' +
+          '`!quiz` — Ôn tập flashcard (FSRS)\n' +
+          '`!quiz stats` — Xem thống kê\n' +
+          '`!answer <id> <đáp án>` — Trả lời flashcard\n' +
+          '`!learn <url>` — Học từ URL/PDF\n' +
+          '`!path <topic>` — Tạo lộ trình học\n' +
+          '`!cs <subject>` — Học CS theo chủ đề\n' +
+          '`!cs list` — Xem danh sách môn CS\n' +
+          '`!gaps` — Xem lỗ hổng kiến thức\n' +
+          '`!resources <keyword>` — Tìm free DevOps resources\n\n' +
+          '**🔍 Phân tích & Kiểm tra:**\n' +
+          '`!analyze <code>` — Phân tích code\n' +
+          '`!audit <code>` — Quét bảo mật\n' +
+          '`!profile <code>` — Phân tích performance\n' +
+          '`!logs <text>` — Phân tích logs\n\n' +
+          '**⚙️ Tuỳ chọn:**\n' +
+          '`!profile` — Xem hồ sơ học tập\n' +
+          '`!preferences show` — Xem tuỳ chọn\n' +
+          '`!preferences model openrouter|gemini|auto` — Chọn model\n\n' +
+          '**🎨 Sáng tạo:**\n' +
+          '`!animate <mô tả>` — Tạo video animation\n\n' +
+          '**👁️ Đa giác quan:**\n' +
+          '`!vision` + ảnh — Phân tích ảnh\n' +
+          '`!voice` + audio — Transcribe giọng nói\n\n' +
+          '**🧠 Nâng cao:**\n' +
+          '`!review` — Shadow Review\n' +
+          '`!incident` — Chaos Engineering\n' +
+          '`!memory <nội dung>` — Lưu trí nhớ\n' +
+          '`!f1stats` — F1 Score Dashboard\n\n' +
+          '**🎙️ Voice:**\n' +
+          '`!join` — Tham gia voice channel\n' +
+          '`!leave` — Rời voice channel\n' +
+          '`!vc on` — Bật voice conversation (nghe & nói)\n' +
+          '`!vc off` — Tắt voice conversation\n' +
+          '`!voice study` — Chế độ học (im lặng)\n' +
+          '`!voice stop` — Tắt chế độ học\n\n' +
+          '**⚙️ Hệ thống:**\n' +
+          '`!plugins` — Xem plugins\n' +
+          '`!plugin unload <name>` — Unload plugin\n' +
+          '`!agentstats` — Thống kê sử dụng agents\n' +
+          '`!help` — Xem danh sách lệnh\n\n' +
+          '**💼 Career & Interview:**\n' +
+          '`!draft <JD text>` — Soạn thảo outreach (3 versions)\n' +
+          '`!interview start` — Mock interview với Staff Engineer\n' +
+          '`!interview end` — Kết thúc mock interview\n' +
+          '`!done` — Đánh dấu giải xong bài Algo\n\n' +
+          '**🤖 Daily Algo Bot:**\n' +
+          '8:00 AM — Gửi bài thuật toán vào #daily-algo\n' +
+          '23:59 PM — Gửi đáp án nếu chưa !done\n' +
+          '`!done` — Đánh dấu giải xong\n\n' +
+          '**💼 Job Bot:**\n' +
+          'Mỗi 6h — Scrape SimplifyJobs → gửi #job-alerts\n\n' +
+          '**🤖 Serena** — AI Robot Girl Companion | MIT License',
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    }
+
     // ── Tier 1: Idempotency check — chặn duplicate requests ──
     // Bypass cho lệnh nhanh (không cần cache vì chạy < 1s)
     const isFastCommand = /^!(help|voice|plugins|plugin unload|ping|status|uptime)(\s|$)/i.test(content);
@@ -610,78 +680,6 @@ client.on(Events.MessageCreate, async (message) => {
         await message.reply('❌ Lỗi: ' + err.message);
       }
       return;
-    }
-
-    // ── !help command (moved up to avoid intent classification blocking) ──
-    if (content === '!help' || content === '!help ') {
-      return message.channel.send({
-        content:
-          '📋 **Danh sách lệnh AI Brain v7.0:**\n\n' +
-          '**🔍 Hỏi đáp & Tìm kiếm:**\n' +
-          '`!ask <câu hỏi>` — Hỏi AI (RAG + Web Search)\n' +
-          '`!ask <câu hỏi> --deep` — Tìm kiếm sâu\n\n' +
-          '**💻 Code & Thuật toán:**\n' +
-          '`!run <code>` — Chạy code trong Sandbox\n' +
-          '`!code <bài toán>` — Viết + chạy code\n' +
-          '`!debate <bài toán>` — Tranh luận đa tác nhân\n' +
-          '`!cli <tool>` — Tìm lệnh CLI (0% hallucination)\n\n' +
-          '**📚 Học tập & Ôn tập:**\n' +
-          '`!quiz` — Ôn tập flashcard (FSRS)\n' +
-          '`!quiz stats` — Xem thống kê\n' +
-          '`!answer <id> <đáp án>` — Trả lời flashcard\n' +
-          '`!learn <url>` — Học từ URL/PDF\n' +
-          '`!path <topic>` — Tạo lộ trình học\n' +
-          '`!cs <subject>` — Học CS theo chủ đề\n' +
-          '`!cs list` — Xem danh sách môn CS\n' +
-          '`!gaps` — Xem lỗ hổng kiến thức\n' +
-          '`!resources <keyword>` — Tìm free DevOps resources\n\n' +
-          '**🔍 Phân tích & Kiểm tra:**\n' +
-          '`!analyze <code>` — Phân tích code\n' +
-          '`!audit <code>` — Quét bảo mật\n' +
-          '`!profile <code>` — Phân tích performance\n' +
-          '`!logs <text>` — Phân tích logs\n\n' +
-          '**⚙️ Tuỳ chọn:**\n' +
-          '`!profile` — Xem hồ sơ học tập\n' +
-          '`!preferences show` — Xem tuỳ chọn\n' +
-          '`!preferences model openrouter|gemini|auto` — Chọn model\n\n' +
-          '**🎨 Sáng tạo:**\n' +
-          '`!animate <mô tả>` — Tạo video animation\n\n' +
-          '**👁️ Đa giác quan:**\n' +
-          '`!vision` + ảnh — Phân tích ảnh\n' +
-          '`!voice` + audio — Transcribe giọng nói\n\n' +
-          '**🧠 Nâng cao:**\n' +
-          '`!review` — Shadow Review\n' +
-          '`!incident` — Chaos Engineering\n' +
-          '`!memory <nội dung>` — Lưu trí nhớ\n' +
-          '`!f1stats` — F1 Score Dashboard\n\n' +
-          '**🎙️ Voice:**\n' +
-          '`!join` — Tham gia voice channel\n' +
-          '`!leave` — Rời voice channel\n' +
-          '`!vc on` — Bật voice conversation (nghe & nói)\n' +
-          '`!vc off` — Tắt voice conversation\n' +
-          '`!voice study` — Chế độ học (im lặng)\n' +
-          '`!voice stop` — Tắt chế độ học\n\n' +
-          '**⚙️ Hệ thống:**\n' +
-          '`!plugins` — Xem plugins\n' +
-          '`!plugin unload <name>` — Unload plugin\n' +
-          '`!agentstats` — Thống kê sử dụng agents\n' +
-          '`!help` — Xem danh sách lệnh\n\n' +
-          '**💼 Career & Interview:**\n' +
-          '`!draft <JD text>` — Soạn thảo outreach (3 versions)\n' +
-          '`!interview start` — Mock interview với Staff Engineer\n' +
-          '`!interview end` — Kết thúc mock interview\n' +
-          '`!done` — Đánh dãu giải xong bài Algo\n\n' +
-          '**📷 Camera (Web UI):**\n' +
-          'Nhấn tab 📷 để nhận diện cảm xúc (demo mode)\n\n' +
-          '**🤖 Daily Algo Bot:**\n' +
-          '8:00 AM — Gửi bài thuật toán vào #daily-algo\n' +
-          '23:59 PM — Gửi đáp án nếu chưa !done\n' +
-          '`!done` — Đánh dãu giải xong\n\n' +
-          '**💼 Job Bot:**\n' +
-          'Mỗi 6h — Scrape SimplifyJobs → gửi #job-alerts\n\n' +
-          '**🤖 Serena** — AI Robot Girl Companion | MIT License',
-        allowedMentions: { parse: [], repliedUser: false },
-      });
     }
 
     // ── !agentstats command: Agent Usage Statistics ──
