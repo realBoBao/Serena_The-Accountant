@@ -414,13 +414,13 @@ function formatWebContext(results) {
 }
 
 /**
- * Format search results with score (weight) for display.
+ * Format search results — grouped by source type for compact display.
  * Used by Discord bot, REST API, and webhook notifications.
- * 
+ *
  * @param {Array} results - Array of result objects with score, title, url, source, etc.
  * @param {string} type - 'local' for vector/BM25 results, 'web' for web search results
  * @param {number} maxItems - Max number of sources to show (default 5)
- * @returns {string} Formatted source list with scores
+ * @returns {string} Formatted source summary grouped by type
  */
 function formatSourcesWithScore(results, type = 'web', maxItems = 5) {
   if (!results || results.length === 0) return '';
@@ -437,50 +437,63 @@ function formatSourcesWithScore(results, type = 'web', maxItems = 5) {
   });
 
   const items = deduped.slice(0, maxItems);
-  const lines = [];
 
-  for (let i = 0; i < items.length; i++) {
-    const r = items[i];
-    const score = r.score != null ? Number(r.score).toFixed(3) : 'N/A';
-    const title = r.title || r.doc_id || r.url || `Source ${i + 1}`;
-    const url = r.url || '';
-    const source = r.source || (type === 'local' ? 'vector' : 'web');
-
-    // Score bar: ████░░░░░░ (visual weight indicator)
-    // Score is already normalized to 0-1
-    const scoreNum = r.score != null ? Number(r.score) : 0;
-    const barLen = Math.min(10, Math.max(0, Math.round(scoreNum * 10)));
-    const scoreBar = '█'.repeat(barLen) + '░'.repeat(10 - barLen);
-
-    // Dùng Markdown hyperlink [title](url) thay vì URL riêng
-    const linkedTitle = url ? `[${title.slice(0, 80)}](${url})` : title.slice(0, 80);
-    let line = `**${i + 1}.** [${source.toUpperCase()}] ${linkedTitle}\n`;
-    line += `   📊 Score: **${scoreNum.toFixed(3)}** ${scoreBar}`;
-
-    // Extra metadata for web results
-    if (type === 'web') {
-      if (r.views) line += ` | 👁 ${Number(r.views).toLocaleString()} views`;
-      if (r.stars) line += ` | ⭐ ${Number(r.stars).toLocaleString()}`;
-      if (r.likes) line += ` | ❤ ${Number(r.likes).toLocaleString()}`;
-      if (r.channelTitle) line += `\n   📺 ${r.channelTitle}`;
-      if (r.language) line += ` | 🌐 ${r.language}`;
-    }
-
-    // Extra metadata for local results
-    if (type === 'local') {
-      if (r.collection) line += ` | 📁 ${r.collection}`;
-      if (r.hybridScore != null) line += ` | hybrid: ${r.hybridScore.toFixed(3)}`;
-      // Add chunk preview for local results (first 120 chars)
-      if (r.chunk_text) {
-        const preview = r.chunk_text.replace(/\n/g, ' ').trim().slice(0, 120);
-        line += `\n   📝 ${preview}${r.chunk_text.length > 120 ? '...' : ''}`;
-      }
-    }
-
-    lines.push(line);
+  // Group by source type
+  const groups = { youtube: [], github: [], web: [], local: [], other: [] };
+  for (const r of items) {
+    const s = (r.source || 'other').toLowerCase();
+    if (s.includes('youtube')) groups.youtube.push(r);
+    else if (s.includes('github')) groups.github.push(r);
+    else if (s.includes('local') || s.includes('vector') || s.includes('sqlite')) groups.local.push(r);
+    else if (s.includes('web') || s.includes('tavily') || s.includes('google')) groups.web.push(r);
+    else groups.other.push(r);
   }
 
-  return lines.join('\n\n');
+  const lines = [];
+  const avgScore = items.length > 0
+    ? (items.reduce((s, r) => s + (r.score || 0), 0) / items.length).toFixed(2)
+    : 'N/A';
+
+  // Build grouped summary
+  if (groups.youtube.length > 0) {
+    const top = groups.youtube[0];
+    const title = top.title.replace(/^\[YouTube\]\s*/, '').slice(0, 60);
+    const url = top.url || '';
+    const linked = url ? `[${title}](${url})` : title;
+    lines.push(`🎬 **YouTube** (${groups.youtube.length} video) — ${linked}`);
+  }
+  if (groups.github.length > 0) {
+    const top = groups.github[0];
+    const title = top.title.replace(/^\[GitHub\]\s*/, '').slice(0, 60);
+    const url = top.url || '';
+    const linked = url ? `[${title}](${url})` : title;
+    const stars = top.stars ? ` ⭐${Number(top.stars).toLocaleString()}` : '';
+    lines.push(`💻 **GitHub** (${groups.github.length} repo) — ${linked}${stars}`);
+  }
+  if (groups.web.length > 0) {
+    const top = groups.web[0];
+    const title = top.title.slice(0, 60);
+    const url = top.url || '';
+    const linked = url ? `[${title}](${url})` : title;
+    lines.push(`🌐 **Web** (${groups.web.length} nguồn) — ${linked}`);
+  }
+  if (groups.local.length > 0) {
+    lines.push(`📁 **Local/Knowledge Base** (${groups.local.length} kết quả)`);
+  }
+  if (groups.other.length > 0) {
+    const top = groups.other[0];
+    const title = top.title.slice(0, 60);
+    const url = top.url || '';
+    const linked = url ? `[${title}](${url})` : title;
+    lines.push(`📄 **Khác** (${groups.other.length}) — ${linked}`);
+  }
+
+  // Add score summary
+  if (lines.length > 0) {
+    lines.push(`\n📊 Điểm trung bình: ${avgScore}`);
+  }
+
+  return lines.join('\n');
 }
 
 function formatResponse(response) {
@@ -632,7 +645,17 @@ async function localRetrieval(query, biasTopic, queryEmbedding, category = null)
       }
       return { ...item, score };
     })
-    .filter((item) => item.score > 0.1) // Lower threshold for SQLite fallback
+    .filter((item) => {
+      // Filter zero-vectors (poisoned embeddings from failed API calls)
+      if (item.embedding && Array.isArray(item.embedding)) {
+        const allZero = item.embedding.every(v => v === 0);
+        if (allZero) {
+          logger.debug(`[localRetrieval] Skipping zero-vector: ${item.doc_id || item.url || 'unknown'}`);
+          return false;
+        }
+      }
+      return item.score > 0.1;
+    })
     .sort((a, b) => b.score - a.score)
     .slice(0, maxResults);
 }
