@@ -1,0 +1,12 @@
+{
+  "summary": [
+    "{\n  \"name\": \"my-ai-brain\",\n  \"version\": \"1.0.0\",\n  \"description\": \"\",\n  \"main\": \"index.js\",\n  \"scripts\": {\n    \"start\": \"node index.js\",\n    \"pipeline\": \"node pipeline_report_v2.js \\\"backend beginner\\\"\",\n    \"feedback\": \"node feedback_server.js\",\n    \"analyze-text\": \"node analyze_text.js\",\n    \"analyze-text-gemini\": \"node analyze_text_gemini.js\",\n    \"test\": \"echo \\\"Error: no test specified\\\" && exit 1\"\n  },\n  \"keywords\": [],\n  \"author\": \"\",\n  \"license\": \"ISC\",\n  \"type\": \"module\",\n  \"dependencies\": {\n    \"@langchain/google-genai\": \"^2.1.31\",\n    \"dotenv\": \"^17.4.2\",\n    \"langchain\": \"^1.4.2\",\n    \"sqlite\": \"^5.1.1\",\n    \"sqlite3\": \"^5.1.6\"\n  }\n}"
+  ],
+  "flashcards": [
+    {
+      "question": "What is described by: \"{\n  \"name\": \"my-ai-brain\",\n  \"version\": \"1.0.0\",\n  \"descript...\"?",
+      "answer": "{\n  \"name\": \"my-ai-brain\",\n  \"version\": \"1.0.0\",\n  \"description\": \"\",\n  \"main\": \"index.js\",\n  \"scripts\": {\n    \"start\": \"node index.js\",\n    \"pipeline\": \"node pipeline_report_v2.js \\\"backend beginner\\\"\",\n    \"feedback\": \"node feedback_server.js\",\n    \"analyze-text\": \"node analyze_text.js\",\n    \"analyze-text-gemini\": \"node analyze_text_gemini.js\",\n    \"test\": \"echo \\\"Error: no test specified\\\" && exit 1\"\n  },\n  \"keywords\": [],\n  \"author\": \"\",\n  \"license\": \"ISC\",\n  \"type\": \"module\",\n  \"dependencies\": {\n    \"@langchain/google-genai\": \"^2.1.31\",\n    \"dotenv\": \"^17.4.2\",\n    \"langchain\": \"^1.4.2\",\n    \"sqlite\": \"^5.1.1\",\n    \"sqlite3\": \"^5.1.6\"\n  }\n}"
+    }
+  ],
+  "complexity": []
+}

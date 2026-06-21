@@ -1,0 +1,69 @@
+{
+  "description": "DevOps & Free Resources Database (ripienaar/free-for-dev, btw-so/open-source-alternatives, sdmg15/Best-websites-a-programmer-should-visit)",
+  "categories": [
+    {
+      "name": "Free Hosting / Cloud",
+      "source": "ripienaar/free-for-dev",
+      "items": [
+        { "name": "Vercel", "url": "https://vercel.com", "tier": "Free", "desc": "Frontend hosting, serverless functions" },
+        { "name": "Railway", "url": "https://railway.app", "tier": "Free", "desc": "Full-stack hosting, databases" },
+        { "name": "Render", "url": "https://render.com", "tier": "Free", "desc": "Static sites, web services, PostgreSQL" },
+        { "name": "Fly.io", "url": "https://fly.io", "tier": "Free", "desc": "Run Docker containers globally" },
+        { "name": "Oracle Cloud Free Tier", "url": "https://oracle.com/cloud/free", "tier": "Always Free", "desc": "4 ARM CPUs, 24GB RAM, 200GB storage" },
+        { "name": "GitHub Pages", "url": "https://pages.github.com", "tier": "Free", "desc": "Static site hosting" },
+        { "name": "Cloudflare Workers", "url": "https://workers.cloudflare.com", "tier": "Free", "desc": "Serverless at edge, 100k req/day" },
+        { "name": "Deno Deploy", "url": "https://deno.com/deploy", "tier": "Free", "desc": "Edge runtime for Deno/TS" }
+      ]
+    },
+    {
+      "name": "Free Databases",
+      "source": "ripienaar/free-for-dev",
+      "items": [
+        { "name": "Supabase", "url": "https://supabase.com", "tier": "Free", "desc": "PostgreSQL, Auth, Storage, Realtime" },
+        { "name": "PlanetScale", "url": "https://planetscale.com", "tier": "Free", "desc": "MySQL-compatible, serverless" },
+        { "name": "Neon", "url": "https://neon.tech", "tier": "Free", "desc": "Serverless PostgreSQL, branching" },
+        { "name": "MongoDB Atlas", "url": "https://mongodb.com/atlas", "tier": "Free", "desc": "512MB-5GB MongoDB" },
+        { "name": "Upstash", "url": "https://upstash.com", "tier": "Free", "desc": "Redis & Kafka serverless" },
+        { "name": "Turso", "url": "https://turso.tech", "tier": "Free", "desc": "SQLite at edge, 9GB storage" }
+      ]
+    },
+    {
+      "name": "Free APIs & Services",
+      "source": "ripienaar/free-for-dev",
+      "items": [
+        { "name": "Cloudflare R2", "url": "https://developers.cloudflare.com/r2", "tier": "Free", "desc": "S3-compatible storage, no egress fees" },
+        { "name": "Resend", "url": "https://resend.com", "tier": "Free", "desc": "Email API, 3k emails/month" },
+        { "name": "Clerk", "url": "https://clerk.com", "tier": "Free", "desc": "Auth, user management" },
+        { "name": "Sentry", "url": "https://sentry.io", "tier": "Free", "desc": "Error tracking, 5k events/month" },
+        { "name": "PostHog", "url": "https://posthog.com", "tier": "Free", "desc": "Product analytics, 1M events/month" }
+      ]
+    },
+    {
+      "name": "Open Source Alternatives",
+      "source": "btw-so/open-source-alternatives",
+      "items": [
+        { "name": "Supabase → Firebase", "url": "https://supabase.com", "desc": "Full Firebase replacement" },
+        { "name": "MinIO → AWS S3", "url": "https://min.io", "desc": "Self-hosted S3-compatible storage" },
+        { "name": "Grafana Cloud → Datadog", "url": "https://grafana.com", "desc": "Monitoring, free tier" },
+        { "name": "Plausible → Google Analytics", "url": "https://plausible.io", "desc": "Privacy-friendly analytics" },
+        { "name": "NocoDB → Airtable", "url": "https://nocodb.com", "desc": "Open-source Airtable alternative" },
+        { "name": "AppWrite → Firebase", "url": "https://appwrite.io", "desc": "Open-source BaaS" },
+        { "name": "Coolify → Heroku", "url": "https://coolify.io", "desc": "Self-hosted Heroku alternative" }
+      ]
+    },
+    {
+      "name": "Best Websites for Programmers",
+      "source": "sdmg15/Best-websites-a-programmer-should-visit",
+      "items": [
+        { "name": "Stack Overflow", "url": "https://stackoverflow.com", "desc": "Q&A for programming" },
+        { "name": "MDN Web Docs", "url": "https://developer.mozilla.org", "desc": "Web technology reference" },
+        { "name": "Exercism", "url": "https://exercism.org", "desc": "Code practice & mentorship" },
+        { "name": "System Design Primer", "url": "https://github.com/donnemartin/system-design-primer", "desc": "Learn how to design large-scale systems" },
+        { "name": "Roadmap.sh", "url": "https://roadmap.sh", "desc": "Developer roadmaps" },
+        { "name": "DevDocs", "url": "https://devdocs.io", "desc": "API documentation browser" },
+        { "name": "Hacker News", "url": "https://news.ycombinator.com", "desc": "Tech news & discussion" },
+        { "name": "Lobste.rs", "url": "https://lobste.rs", "desc": "Computing-focused community" }
+      ]
+    }
+  ]
+}
