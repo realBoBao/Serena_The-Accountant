@@ -22,11 +22,6 @@ const RUN_ON_START = process.env.RUN_ON_START !== 'false';
 const FORCE_RUN = process.env.FORCE_PIPELINE === 'true';
 const TOPIC_OVERRIDE = process.env.PIPELINE_TOPIC || '';
 
-// ── Global cron task references (declared at module scope for gracefulShutdown) ──
-let task = null, memoryTask = null, backupTask = null, evoTask = null;
-let graphTask = null, suggestionTask = null, rssTask = null, jobTask = null;
-let algoTask = null, algoAnswerTask = null;
-
 if (IS_CLOUD_RUN) {
   logger.info('[Scheduler] Running on Cloud Run — node-cron disabled, using Cloud Scheduler');
 } else {
@@ -434,7 +429,8 @@ cleanupStaleTempFiles('.').catch(() => {});
 
 // ── Only schedule cron jobs when NOT on Cloud Run ──
 // On Cloud Run, use Google Cloud Scheduler → HTTP POST → /scheduler/:job
-let task, memoryTask, backupTask;
+// All cron tasks declared at module scope for gracefulShutdown access
+let task, memoryTask, backupTask, evoTask, graphTask, suggestionTask, rssTask, jobTask, algoTask, algoAnswerTask;
 
 if (!IS_CLOUD_RUN) {
   logger.info('[Scheduler] Registering node-cron jobs (local/server mode)');
@@ -466,7 +462,7 @@ if (!IS_CLOUD_RUN) {
 
   // ── EvoAgent: 4:00 AM mỗi ngày — Phân tích logs & tối ưu hệ thống ──
   const EVO_CRON = '0 4 * * *';
-  const evoTask = cron.schedule(EVO_CRON, async () => {
+  evoTask = cron.schedule(EVO_CRON, async () => {
     logger.info('[scheduler] EvoAgent analysis triggered');
     // Session memory cleanup — xóa entries cũ hơn 7 ngày
     try {
@@ -520,7 +516,7 @@ if (!IS_CLOUD_RUN) {
 
   // ── GraphAgent: 5:00 AM Chủ Nhật — Đồng bộ Knowledge Graph ──
   const GRAPH_CRON = '0 5 * * 0';
-  const graphTask = cron.schedule(GRAPH_CRON, async () => {
+  graphTask = cron.schedule(GRAPH_CRON, async () => {
     logger.info('[scheduler] GraphAgent sync triggered');
     try {
       const { syncGraph } = await import('./agents/GraphAgent.js');
@@ -533,7 +529,7 @@ if (!IS_CLOUD_RUN) {
 
   // ── Proactive Suggestion: 8:00 AM mỗi ngày ──
   const SUGGESTION_CRON = '0 8 * * *';
-  const suggestionTask = cron.schedule(SUGGESTION_CRON, async () => {
+  suggestionTask = cron.schedule(SUGGESTION_CRON, async () => {
     logger.info('[scheduler] Proactive suggestion triggered');
     try {
       const { runContextMonitor } = await import('./agents/SuggestionAgent.js');
@@ -568,7 +564,7 @@ if (!IS_CLOUD_RUN) {
 
   // ── Tier 2: Daily RSS Fetch — 6:00 AM PDT ──
   const RSS_CRON = '0 6 * * *';
-  const rssTask = cron.schedule(RSS_CRON, async () => {
+  rssTask = cron.schedule(RSS_CRON, async () => {
     logger.info('[scheduler] Daily RSS fetch triggered');
     try {
       const { runDailyRssFetch } = await import('./cron/daily_rss_fetch.js');
@@ -582,7 +578,7 @@ if (!IS_CLOUD_RUN) {
 
   // ── Tier 3: Job Scraper — 6:00 AM PDT ──
   const JOB_CRON = '0 6 * * *';
-  const jobTask = cron.schedule(JOB_CRON, async () => {
+  jobTask = cron.schedule(JOB_CRON, async () => {
     logger.info('[Scheduler] Job scraper triggered');
     try {
       const { runJobScraper } = await import('./cron/job_scraper.js');
@@ -606,7 +602,7 @@ if (!IS_CLOUD_RUN) {
 
   // ── Algo Bot: Daily 8AM — Gửi bài thuật toán ──
   const ALGO_CRON = '0 8 * * *';
-  const algoTask = cron.schedule(ALGO_CRON, async () => {
+  algoTask = cron.schedule(ALGO_CRON, async () => {
     logger.info('[Scheduler] Algo Bot: Sending daily problem...');
     try {
       const { execSync } = await import('child_process');
@@ -619,7 +615,7 @@ if (!IS_CLOUD_RUN) {
 
   // ── Algo Bot: 23:59 — Gửi đáp án nếu chưa giải ──
   const ALGO_ANSWER_CRON = '59 23 * * *';
-  const algoAnswerTask = cron.schedule(ALGO_ANSWER_CRON, async () => {
+  algoAnswerTask = cron.schedule(ALGO_ANSWER_CRON, async () => {
     logger.info('[Scheduler] Algo Bot: Checking if answer needed...');
     try {
       const { execSync } = await import('child_process');
