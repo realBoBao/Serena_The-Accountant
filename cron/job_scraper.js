@@ -178,8 +178,10 @@ async function main() {
     return `**${i + 1}.** [${j.source}] **${j.company}** — ${j.role} (${j.location}) ${link}`;
   });
 
+  // Use PDT date for consistency
+  const pdtDate = new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' });
   const embed = {
-    title: `💼 Job Alerts — ${new Date().toLocaleDateString('vi-VN')}`,
+    title: `💼 Job Alerts — ${pdtDate}`,
     description: [
       `📦 **Total Jobs:** ${dedupedJobs.length} | 📊 **By Source:** ${summary}`,
       ``,

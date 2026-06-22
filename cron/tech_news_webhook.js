@@ -200,8 +200,10 @@ async function main() {
   const types = {};
   for (const n of all) types[n.src] = (types[n.src] || 0) + 1;
 
+  // Use PDT date for consistency with other embeds
+  const pdtDate = new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' });
   const embed = {
-    title: `📰 Tech News: "${topic}" — ${new Date().toLocaleDateString('vi-VN')}`,
+    title: `📰 Tech News: "${topic}" — ${pdtDate}`,
     description: [
       `📦 **Total:** ${all.length} | 📊 **By Type:** ${Object.entries(types).map(([t, c]) => `${t}: ${c}`).join(' | ')}`,
       '', ...lines,
