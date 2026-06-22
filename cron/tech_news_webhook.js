@@ -106,9 +106,38 @@ if (!TECH_WEBHOOK) {
 
 // ── Source Router handles all fetching with multi-backend fallback ──
 
+// ── Catch-up tracking file ──
+const CATCHUP_FILE = path.resolve('./.tech_news_catchup.json');
+
+async function wasSentToday(topic) {
+  try {
+    const data = JSON.parse(await fs.readFile(CATCHUP_FILE, 'utf8'));
+    const today = new Date().toISOString().slice(0, 10);
+    return data[today]?.includes(topic);
+  } catch { return false; }
+}
+
+async function markSent(topic) {
+  try {
+    let data = {};
+    try { data = JSON.parse(await fs.readFile(CATCHUP_FILE, 'utf8')); } catch {}
+    const today = new Date().toISOString().slice(0, 10);
+    if (!data[today]) data[today] = [];
+    data[today].push(topic);
+    await fs.writeFile(CATCHUP_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch { /* ignore */ }
+}
+
 async function main() {
   // Pick smart topic (Markov prediction → random fallback)
   const topic = process.argv[2] || await pickSmartTopic();
+
+  // ── Catch-up: Skip if already sent today ──
+  if (await wasSentToday(topic)) {
+    console.log(`[TechNews] Already sent "${topic}" today — skipping (catch-up)`);
+    return;
+  }
+
   await saveTopicHistory(topic);
 
   // Record interaction cho Markov Engine
@@ -128,12 +157,12 @@ async function main() {
     searchWithFallback('arxiv', topic),
   ]);
 
-  // Normalize results to common format
+  // Normalize results to common format with proper scoring
   const allNews = [
-    ...hn.map(n => ({ ...n, type: 'hackernews', score: n.score || 0.5 })),
-    ...reddit.map(n => ({ ...n, type: 'reddit', score: n.score || 0.5 })),
-    ...github.map(n => ({ ...n, type: 'github', score: n.score || 0.5 })),
-    ...arxiv.map(n => ({ ...n, type: 'arxiv', score: 0.75 })),
+    ...hn.map(n => ({ ...n, type: 'hackernews', score: Math.min(1.0, (n.score || 0) / 500) })), // HN: 500+ points = max
+    ...reddit.map(n => ({ ...n, type: 'reddit', score: Math.min(1.0, (n.score || 0) / 200) })), // Reddit: 200+ = max
+    ...github.map(n => ({ ...n, type: 'github', score: Math.min(1.0, (n.score || 0) / 1000) })), // GitHub: 1000+ stars = max
+    ...arxiv.map(n => ({ ...n, type: 'arxiv', score: 0.75 })), // arXiv: fixed high quality
   ];
 
   if (allNews.length === 0) {
@@ -217,6 +246,7 @@ async function main() {
     
     if (res.ok) {
       console.log('[TechNews] ✅ Webhook sent successfully');
+      await markSent(topic); // Mark as sent for catch-up
     } else {
       console.error('[TechNews] ❌ Webhook failed:', res.status, await res.text());
     }

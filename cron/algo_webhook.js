@@ -1,12 +1,34 @@
 /**
- * scripts/algo_webhook.js — Daily Algorithm Problem từ LeetCode
+ * cron/algo_webhook.js — Daily Algorithm Problem từ LeetCode
  * Compatible với cả Node 20 (better-sqlite3) và Node 22+ (node:sqlite)
+ * Catch-up: nếu đã gửi hôm nay thì skip
  */
 
 import 'dotenv/config';
+import fs from 'fs/promises';
+import path from 'path';
 
 const DB_PATH = './vectors.db';
 const ALGO_WEBHOOK_URL = process.env.ALGO_WEBHOOK_URL || '';
+const CATCHUP_FILE = path.resolve('./.algo_catchup.json');
+
+async function wasSentToday() {
+  try {
+    const data = JSON.parse(await fs.readFile(CATCHUP_FILE, 'utf8'));
+    const today = new Date().toISOString().slice(0, 10);
+    return data[today] === true;
+  } catch { return false; }
+}
+
+async function markSent() {
+  try {
+    let data = {};
+    try { data = JSON.parse(await fs.readFile(CATCHUP_FILE, 'utf8')); } catch {}
+    const today = new Date().toISOString().slice(0, 10);
+    data[today] = true;
+    await fs.writeFile(CATCHUP_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch { /* ignore */ }
+}
 
 // ── SQLite helper — Node 22+ (node:sqlite) only ────────────────────────────
 
@@ -114,6 +136,12 @@ async function sendWebhook(payload) {
 // ── Daily: Gửi bài mới ─────────────────────────────────────────────────────
 
 async function sendDailyProblem() {
+  // ── Catch-up: Skip if already sent today ──
+  if (await wasSentToday()) {
+    console.log('[AlgoBot] Already sent today — skipping (catch-up)');
+    return;
+  }
+
   console.log('[AlgoBot] Fetching LeetCode problem...');
 
   // Ensure table exists first
@@ -179,6 +207,7 @@ async function sendDailyProblem() {
 
   const ok = await sendWebhook(payload);
   console.log(`[AlgoBot] Sent: ${title} (${difficulty}) — ${ok ? 'OK' : 'FAILED'}`);
+  if (ok) await markSent(); // Mark as sent for catch-up
 }
 
 // ── Answer: Gửi đáp án 23:59 ────────────────────────────────────────────────

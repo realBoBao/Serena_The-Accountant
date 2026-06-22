@@ -7,5 +7,11 @@
   },
   "distributed systems": {
     "quantum computing": 1
+  },
+  "quantum computing": {
+    "IoT": 1
+  },
+  "IoT": {
+    "IoT": 1
   }
 }
