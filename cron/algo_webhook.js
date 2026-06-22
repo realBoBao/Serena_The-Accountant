@@ -253,12 +253,17 @@ async function sendAnswer() {
 // ── Mark solved ─────────────────────────────────────────────────────────────
 
 async function markSolved() {
-  await withDb(db => {
+  try {
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync('./vectors.db');
     db.exec("CREATE TABLE IF NOT EXISTS algo_daily (key TEXT PRIMARY KEY, value TEXT, created_at TEXT)");
     const today = new Date().toISOString().slice(0, 10);
-    db.prepare('INSERT OR REPLACE INTO algo_daily (key, value, created_at) VALUES ($k, $v, $t)').run({ $k: 'solved', $v: today, $t: new Date().toISOString() });
-  });
-  console.log('[AlgoBot] Marked as solved.');
+    db.prepare("INSERT OR REPLACE INTO algo_daily (key, value, created_at) VALUES (?, ?, ?)").run('solved', today, new Date().toISOString());
+    db.close();
+    console.log('[AlgoBot] Marked as solved.');
+  } catch (err) {
+    console.error('[AlgoBot] markSolved failed:', err.message);
+  }
 }
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
