@@ -6,6 +6,7 @@ name: 🕐 Cron Scraper
 on:
   schedule:
     - cron: '0 15,18,21,0,3 * * *' # 8AM, 11AM, 2PM, 5PM, 8PM PDT
+    - cron: '0 9 * * *'             # 2AM PDT (nightly scraper)
   workflow_dispatch:
     inputs:
       topic:
@@ -99,3 +100,23 @@ jobs:
           JOB_WEBHOOK_URL: ${{ secrets.JOB_WEBHOOK_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node cron/job_scraper.js
+
+  # ── Job 5: Nightly Scraper (2AM PDT) — Embed sources into vector DB ──
+  nightly-scraper:
+    name: 🌙 Nightly Source Scraper
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm install --legacy-peer-deps --ignore-scripts
+      - name: Scrape & Embed Sources
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node cron/nightly_scraper.js
