@@ -20,7 +20,7 @@ if (!JOB_WEBHOOK) {
 async function fetchSimplifyJobs(limit = 10) {
   try {
     // SimplifyJobs GitHub repo — job postings
-    const res = await fetch('https://raw.githubusercontent.com/SimplifyJobs/Summer2025-Internships/dev/README.md');
+    const res = await fetch('https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/README.md');
     if (!res.ok) throw new Error(`SimplifyJobs ${res.status}`);
     const text = await res.text();
     // Parse markdown table
@@ -51,6 +51,7 @@ async function fetchRemoteOK(limit = 10) {
     return (data || []).slice(1, limit + 1).map(j => ({
       company: j.company || 'Unknown',
       role: j.position || 'Unknown',
+      title: j.position || 'Unknown', // ← thêm để isRelevant check được
       location: j.location || 'Remote',
       link: j.url || j.apply_url || '#',
       source: 'RemoteOK',
@@ -92,6 +93,18 @@ async function fetchWeWorkRemotely(limit = 10) {
 async function main() {
   console.log('[JobScraper] Fetching job postings...');
 
+  // ── Dedup: Load seen URLs from SQLite TRƯỚC khi fetch ──
+  let seenUrls = new Set();
+  try {
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync('./vectors.db');
+    db.exec('CREATE TABLE IF NOT EXISTS sent_jobs (url TEXT PRIMARY KEY, sent_at TEXT)');
+    const rows = db.prepare('SELECT url FROM sent_jobs').all();
+    seenUrls = new Set(rows.map(r => r.url));
+    db.close();
+    console.log(`[JobScraper] Loaded ${seenUrls.size} seen job URLs from DB`);
+  } catch { /* ignore */ }
+
   const [simplify, remoteok, wework] = await Promise.all([
     fetchSimplifyJobs(10),
     fetchRemoteOK(10),
@@ -118,15 +131,15 @@ async function main() {
     'msp service delivery', 'director of operations',
   ];
 
-  function isRelevant(title = '', company = '') {
-    const text = (title + ' ' + company).toLowerCase();
+  function isRelevant(title = '', company = '', role = '') {
+    const text = (title + ' ' + company + ' ' + role).toLowerCase();
     const hasRequired = REQUIRED_KEYWORDS.some(k => text.includes(k));
     const hasExcluded = EXCLUDE_KEYWORDS.some(k => text.includes(k));
     return hasRequired && !hasExcluded;
   }
 
   const rawJobs = [...simplify, ...remoteok, ...wework];
-  const filteredJobs = rawJobs.filter(j => isRelevant(j.title, j.company));
+  const filteredJobs = rawJobs.filter(j => isRelevant(j.title, j.company, j.role));
 
   if (filteredJobs.length < rawJobs.length) {
     console.log(`[JobScraper] Filtered: ${rawJobs.length} → ${filteredJobs.length} (removed ${rawJobs.length - filteredJobs.length} irrelevant)`);
@@ -165,9 +178,13 @@ async function main() {
           }
         }
         dedupedJobs = filteredJobs.filter(j => {
-          const urlMatch = sentUrls.has(j.link || '');
-          const titleMatch = sentTitles.has((`${j.company} — ${j.role}`).trim().toLowerCase());
-          return !urlMatch && !titleMatch;
+          // Skip if URL already seen in SQLite DB
+          if (seenUrls.has(j.link || '')) return false;
+          // Skip if URL found in Discord history
+          if (sentUrls.has(j.link || '')) return false;
+          // Skip if title found in Discord history
+          if (sentTitles.has((`${j.company} — ${j.role}`).trim().toLowerCase())) return false;
+          return true;
         });
         if (dedupedJobs.length < filteredJobs.length) {
           console.log(`[JobScraper] Dedup: ${filteredJobs.length} → ${dedupedJobs.length} (removed already sent)`);
