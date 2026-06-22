@@ -28,7 +28,7 @@ import { getEvaluationStats, getModelPerformanceReport, getAllABTestResults, det
 import { listVideos, cleanupOldVideos } from './lib/video_cdn.js';
 import { getSecurityHeaders, validateApiKey, isIpAllowed, checkBodySize, auditLog, validateBody, sanitizeString } from './lib/security.js';
 import { handleInteraction, registerSlashCommands } from './discord_interactions.js';
-import { handleJob } from './scripts/cron/cloud_scheduler_triggers.js';
+import { handleJob } from './cron/cloud_scheduler_triggers.js';
 import { info as logInfo, warn as logWarn, error as logError } from './lib/structured_logger.js';
 
 // Register Discord slash commands on startup (idempotent)

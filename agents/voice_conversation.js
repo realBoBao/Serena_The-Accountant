@@ -80,7 +80,9 @@ export async function textToSpeech(text, voice = 'vi-VN-HoaiMyNeural') {
 }
 
 // ── STT: Audio → Text (Groq Whisper) ──
-
+// ponytail: Opus decode requires @discordjs/voice prism-media decoder
+// FFmpeg cannot decode raw Opus packets from Discord VoiceReceiver
+// TODO: implement proper Opus→PCM→WAV pipeline using prism-media
 export async function speechToText(audioBuffer, language = 'vi') {
   const GROQ_KEY = process.env.GROQ_API_KEY;
   if (!GROQ_KEY) {
@@ -88,42 +90,27 @@ export async function speechToText(audioBuffer, language = 'vi') {
     return null;
   }
 
-  const tmpDir = os.tmpdir();
+  // TEMP: Discord VoiceReceiver sends raw Opus packets, not OGG files
+  // FFmpeg cannot decode these. Need prism-media decoder.
+  // For now, return null to prevent crash.
+  logger.warn('[STT] Opus decode not yet implemented — need prism-media decoder');
+  return null;
 
-  // Convert Opus/OGG → WAV using FFmpeg (Groq Whisper needs WAV/MP3, not raw Opus)
-  const inputPath = path.join(tmpDir, `stt-in-${Date.now()}.ogg`);
+  /* TODO: Implement proper Opus→WAV conversion
+  const tmpDir = os.tmpdir();
+  const inputPath = path.join(tmpDir, `stt-in-${Date.now()}.opus`);
   const outputPath = path.join(tmpDir, `stt-out-${Date.now()}.wav`);
   fs.writeFileSync(inputPath, audioBuffer);
 
-  try {
-    await new Promise((resolve, reject) => {
-      const ffmpeg = spawn('ffmpeg', ['-y', '-i', inputPath, '-ar', '16000', '-ac', '1', '-f', 'wav', outputPath], { stdio: 'pipe' });
-      let stderr = '';
-      ffmpeg.stderr.on('data', d => { stderr += d.toString(); });
-      ffmpeg.on('close', code => {
-        if (code === 0) resolve();
-        else reject(new Error(`FFmpeg exit ${code}: ${stderr.slice(0, 200)}`));
-      });
-      ffmpeg.on('error', err => reject(new Error(`FFmpeg spawn: ${err.message}`)));
-    });
-  } catch (ffmpegErr) {
-    logger.error(`[STT] FFmpeg convert failed: ${ffmpegErr.message}`);
-    // Fallback: try sending original OGG anyway
-  }
+  // Use prism-media to decode Opus → PCM, then write WAV
+  // const { OpusDecoder } = require('@discordjs/opus');
+  // ... conversion code ...
 
-  // Use WAV if conversion succeeded, otherwise fallback to original
-  const sendPath = fs.existsSync(outputPath) ? outputPath : inputPath;
-  const sendBuffer = fs.readFileSync(sendPath);
-  const filename = sendPath.endsWith('.wav') ? 'audio.wav' : 'audio.ogg';
-  const contentType = sendPath.endsWith('.wav') ? 'audio/wav' : 'audio/ogg';
+  const sendBuffer = fs.readFileSync(outputPath);
+  const filename = 'audio.wav';
+  const contentType = 'audio/wav';
 
-  // Cleanup temp files
-  try { fs.unlinkSync(inputPath); } catch {}
-  try { fs.unlinkSync(outputPath); } catch {}
-
-  // Thử lần lượt các Whisper models
   const models = ['whisper-large-v3-turbo', 'whisper-large-v3'];
-
   for (const model of models) {
     try {
       const boundary = '----FormBoundary' + Date.now();
