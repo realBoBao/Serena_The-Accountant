@@ -30,6 +30,6 @@ jobs:
       - run: npm install --legacy-peer-deps --ignore-scripts
       - name: Send Tech News
         env:
-          TECH_WEBHOOK_URL: ${{ secrets.TECH_WEBHOOK_URL }}
+          TECH_WEBHOOK_URL: ${{ secrets.TECH_WEBHOOK }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
         run: node cron/tech_news_webhook.js "${{ github.event.inputs.topic || '' }}"

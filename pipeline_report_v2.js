@@ -278,7 +278,7 @@ async function youtubeSearchVideos(topic, maxResults = YOUTUBE_MAX_RESULTS, minV
         });
         if (apiKey) params.set('key', apiKey);
         const res = await fetchWithRetry(`${YOUTUBE_SEARCH_URL}?${params.toString()}`, { signal });
-        if (!res.ok) throw new Error(`Youtube ${res.status}`);
+        if (!res.ok) { console.warn(`[Pipeline] YouTube ${res.status} (no API key?), skipping`); return []; }
         const j = await res.json();
         const videos = (j.items || []).map((item) => ({
           videoId: item.id.videoId,
