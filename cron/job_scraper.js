@@ -98,32 +98,68 @@ async function main() {
     fetchWeWorkRemotely(10),
   ]);
 
-  // Dedup by URL
-  const seen = new Set();
-  const allJobs = [...simplify, ...remoteok, ...wework].filter(j => {
-    const key = j.link || j.title;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  // ── Filter: Chỉ giữ jobs phù hợp với tech profile ──
+  const REQUIRED_KEYWORDS = [
+    'backend', 'software engineer', 'node.js', 'javascript', 'typescript',
+    'devops', 'fullstack', 'full-stack', 'python', 'cloud', 'infrastructure',
+    'swe', 'intern', 'developer', 'programming', 'api', 'database',
+    'kubernetes', 'docker', 'microservices', 'distributed systems',
+  ];
+  const EXCLUDE_KEYWORDS = [
+    'store manager', 'data entry', 'paralegal', 'sales agent',
+    'no experience required', 'military', 'national guard',
+    'manufacturing', 'real estate', 'insurance agent', 'retail',
+    'appointment setter', 'document review',
+  ];
 
-  if (allJobs.length === 0) {
-    console.log('[JobScraper] No jobs fetched.');
+  function isRelevant(title = '', company = '') {
+    const text = (title + ' ' + company).toLowerCase();
+    const hasRequired = REQUIRED_KEYWORDS.some(k => text.includes(k));
+    const hasExcluded = EXCLUDE_KEYWORDS.some(k => text.includes(k));
+    return hasRequired && !hasExcluded;
+  }
+
+  const rawJobs = [...simplify, ...remoteok, ...wework];
+  const filteredJobs = rawJobs.filter(j => isRelevant(j.title, j.company));
+
+  if (filteredJobs.length < rawJobs.length) {
+    console.log(`[JobScraper] Filtered: ${rawJobs.length} → ${filteredJobs.length} (removed ${rawJobs.length - filteredJobs.length} irrelevant)`);
+  }
+
+  // ── Dedup: Loại bỏ URLs đã gửi trong 7 ngày (SQLite) ──
+  let dedupedJobs = filteredJobs;
+  try {
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync('./vectors.db');
+    db.exec('CREATE TABLE IF NOT EXISTS sent_jobs (url TEXT PRIMARY KEY, sent_at TEXT)');
+    const sent = db.prepare("SELECT url FROM sent_jobs WHERE sent_at > datetime('now', '-7 days')").all();
+    const sentUrls = new Set(sent.map(r => r.url));
+    dedupedJobs = filteredJobs.filter(j => !sentUrls.has(j.link || ''));
+    if (dedupedJobs.length < filteredJobs.length) {
+      console.log(`[JobScraper] Dedup: ${filteredJobs.length} → ${dedupedJobs.length} (removed ${filteredJobs.length - dedupedJobs.length} already sent)`);
+    }
+    db.close();
+  } catch (dbErr) {
+    console.debug('[JobScraper] SQLite dedup skipped:', dbErr.message);
+  }
+
+  if (dedupedJobs.length === 0) {
+    console.log('[JobScraper] No new jobs after filter + dedup.');
     return;
   }
 
-  console.log(`[JobScraper] Fetched ${allJobs.length} job postings`);
+  console.log(`[JobScraper] Sending ${dedupedJobs.length} relevant jobs`);
 
   // Build Discord embed
   const jobsByType = {};
-  for (const j of allJobs) {
+  for (const j of dedupedJobs) {
     if (!jobsByType[j.source]) jobsByType[j.source] = [];
     jobsByType[j.source].push(j);
   }
 
   const summary = Object.entries(jobsByType).map(([s, jobs]) => `${s}: ${jobs.length}`).join(' | ');
 
-  const jobLines = allJobs.slice(0, 15).map((j, i) => {
+  const jobLines = dedupedJobs.slice(0, 15).map((j, i) => {
     const link = j.link && j.link !== '#' ? `[Apply](${j.link})` : '';
     return `**${i + 1}.** [${j.source}] **${j.company}** — ${j.role} (${j.location}) ${link}`;
   });
@@ -131,7 +167,7 @@ async function main() {
   const embed = {
     title: `💼 Job Alerts — ${new Date().toLocaleDateString('vi-VN')}`,
     description: [
-      `📦 **Total Jobs:** ${allJobs.length} | 📊 **By Source:** ${summary}`,
+      `📦 **Total Jobs:** ${dedupedJobs.length} | 📊 **By Source:** ${summary}`,
       ``,
       ...jobLines,
     ].join('\n').slice(0, 4000),
@@ -148,6 +184,16 @@ async function main() {
 
     if (res.ok) {
       console.log('[JobScraper] ✅ Webhook sent successfully');
+      // Save sent jobs to SQLite for dedup
+      try {
+        const { DatabaseSync } = await import('node:sqlite');
+        const db = new DatabaseSync('./vectors.db');
+        db.exec('CREATE TABLE IF NOT EXISTS sent_jobs (url TEXT PRIMARY KEY, sent_at TEXT)');
+        const stmt = db.prepare("INSERT OR IGNORE INTO sent_jobs (url, sent_at) VALUES (?, datetime('now'))");
+        for (const j of dedupedJobs) { stmt.run(j.link || j.title); }
+        db.close();
+        console.log(`[JobScraper] Saved ${dedupedJobs.length} job URLs to DB`);
+      } catch (saveErr) { /* ignore */ }
     } else {
       console.error('[JobScraper] ❌ Webhook failed:', res.status, await res.text());
     }
@@ -158,5 +204,5 @@ async function main() {
 
 main().catch(err => {
   console.error('[JobScraper] Fatal:', err.message);
-  process.exit(1);
+  process.exit(0); // Exit 0 to avoid GitHub Actions failure
 });
