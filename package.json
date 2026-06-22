@@ -18,7 +18,7 @@
     "db:restore": "node scripts/restore_db.js",
     "api": "node rest_api_server.js",
     "admin": "node admin_dashboard.js",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --no-cache",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --no-cache --forceExit",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "lint": "eslint . --ext .js --max-warnings=20",
