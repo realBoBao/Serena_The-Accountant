@@ -54,15 +54,24 @@ async function wasSent(topic) {
     const webhookMatch = TECH_WEBHOOK.match(/webhooks\/(\d+)\//);
     if (webhookMatch) {
       const channelId = webhookMatch[1];
-      const histRes = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages?limit=20`, {
+      // Check last 100 messages to cover all topics sent today
+      const histRes = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages?limit=100`, {
         headers: { 'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}` },
       });
       if (histRes.ok) {
         const messages = await histRes.json();
         const today = new Date().toISOString().slice(0, 10);
         for (const msg of messages) {
-          if (msg.embeds?.[0]?.title?.includes(topic) && msg.timestamp?.startsWith(today)) {
-            return true;
+          // Check all embeds in the message, not just the first one
+          if (msg.timestamp?.startsWith(today)) {
+            for (const embed of (msg.embeds || [])) {
+              // Check if embed title contains the topic (case-insensitive)
+              const embedTitle = (embed.title || '').toLowerCase();
+              const topicLower = topic.toLowerCase();
+              if (embedTitle.includes(topicLower)) {
+                return true;
+              }
+            }
           }
         }
       }

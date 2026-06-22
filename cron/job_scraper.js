@@ -109,7 +109,13 @@ async function main() {
     'store manager', 'data entry', 'paralegal', 'sales agent',
     'no experience required', 'military', 'national guard',
     'manufacturing', 'real estate', 'insurance agent', 'retail',
-    'appointment setter', 'document review',
+    'appointment setter', 'document review', 'outside sales',
+    'operations roles', 'membership offers', 'assistant store',
+    'financial accountant', 'account manager', 'credit card',
+    'business strategy', 'oracle services', 'workday',
+    'cyber', 'project scheduling', 'project assistant',
+    'data analyst', 'analytics and bi', 'data warehouse',
+    'msp service delivery', 'director of operations',
   ];
 
   function isRelevant(title = '', company = '') {
@@ -126,28 +132,43 @@ async function main() {
     console.log(`[JobScraper] Filtered: ${rawJobs.length} → ${filteredJobs.length} (removed ${rawJobs.length - filteredJobs.length} irrelevant)`);
   }
 
-  // ── Dedup: Loại bỏ URLs đã gửi gần đây (check Discord history) ──
+  // ── Dedup: Loại bỏ jobs đã gửi (check Discord history bằng URL + title) ──
   let dedupedJobs = filteredJobs;
   try {
-    // Extract channel ID from webhook URL
     const webhookMatch = JOB_WEBHOOK.match(/webhooks\/(\d+)\//);
     if (webhookMatch) {
       const channelId = webhookMatch[1];
-      // Fetch last 50 messages from the webhook channel
       const histRes = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages?limit=50`, {
         headers: { 'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}` },
       });
       if (histRes.ok) {
         const messages = await histRes.json();
         const sentUrls = new Set();
+        const sentTitles = new Set();
         for (const msg of messages) {
+          // Extract URLs from embed description
           if (msg.embeds?.[0]?.description) {
-            // Extract all URLs from embed description
             const urlMatches = msg.embeds[0].description.match(/https?:\/\/[^\s\)]+/g);
             if (urlMatches) urlMatches.forEach(u => sentUrls.add(u));
           }
+          // Extract job titles from embed description
+          // Format: **1.** [Source] **Company — Role** — description [Apply](url)
+          if (msg.embeds?.[0]?.description) {
+            const lines = msg.embeds[0].description.split('\n');
+            for (const line of lines) {
+              // Match lines like: **1.** [Source] **Company — Role** — ...
+              const m = line.match(/\*\*[^\]]+\.\*\*\s*\[[^\]]+\]\s*\*\*([^*]+)\*\*/);
+              if (m) {
+                sentTitles.add(m[1].trim().toLowerCase());
+              }
+            }
+          }
         }
-        dedupedJobs = filteredJobs.filter(j => !sentUrls.has(j.link || ''));
+        dedupedJobs = filteredJobs.filter(j => {
+          const urlMatch = sentUrls.has(j.link || '');
+          const titleMatch = sentTitles.has((`${j.company} — ${j.role}`).trim().toLowerCase());
+          return !urlMatch && !titleMatch;
+        });
         if (dedupedJobs.length < filteredJobs.length) {
           console.log(`[JobScraper] Dedup: ${filteredJobs.length} → ${dedupedJobs.length} (removed already sent)`);
         }
