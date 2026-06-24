@@ -59,9 +59,15 @@ jobs:
             fi
             pip3 install -r requirements.txt || echo "⚠️ Python deps install skipped"
 
-            # Install Node dependencies (Tier 2: no log masking)
+            # Install Node dependencies
             echo "📦 Installing Node dependencies..."
-            npm install --legacy-peer-deps --omit=dev --no-audit --no-fund
+            npm install --legacy-peer-deps --no-audit --no-fund
+            # Rebuild native modules (better-sqlite3 needs g++ on Linux)
+            echo "🔧 Rebuilding native modules..."
+            if ! command -v g++ &> /dev/null; then
+              sudo apt-get install -y -qq build-essential python3
+            fi
+            npm rebuild better-sqlite3 2>&1 || echo "⚠️ better-sqlite3 rebuild skipped (prebuilt binary)"
             echo "📦 Installed $(ls node_modules | wc -l) packages"
 
             # Rebuild native modules for current Node version (sqlite3 needs C++ compiler)
