@@ -1,6 +1,6 @@
 /**
  * cron/algo_webhook.js — Daily Algorithm Problem từ LeetCode
- * Compatible với cả Node 20 (better-sqlite3) và Node 22+ (node:sqlite)
+ * Stateless: gửi đáp án ngay trong Spoiler, không cần DB
  * Catch-up: nếu đã gửi hôm nay thì skip
  */
 
@@ -8,23 +8,13 @@ import 'dotenv/config';
 import fs from 'fs/promises';
 import path from 'path';
 
-const DB_PATH = './vectors.db';
 const ALGO_WEBHOOK_URL = process.env.ALGO_WEBHOOK_URL || '';
 const CATCHUP_FILE = path.resolve('./.algo_catchup.json');
 
-// Get date in PDT (UTC-7) — algo should send in the morning PDT
 function getPdtDate() {
   const now = new Date();
   const pdt = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
   return `${pdt.getFullYear()}-${String(pdt.getMonth() + 1).padStart(2, '0')}-${String(pdt.getDate()).padStart(2, '0')}`;
-}
-
-// Check if current time is within sending window (6AM-12PM PDT)
-function isSendingWindow() {
-  const now = new Date();
-  const pdt = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-  const hour = pdt.getHours();
-  return hour >= 6 && hour < 12; // 6AM-12PM PDT
 }
 
 async function wasSentToday() {
@@ -41,74 +31,6 @@ async function markSent() {
     data[getPdtDate()] = true;
     await fs.writeFile(CATCHUP_FILE, JSON.stringify(data, null, 2), 'utf8');
   } catch { /* ignore */ }
-}
-
-// ── SQLite helper — Node 22+ (node:sqlite) only ────────────────────────────
-
-async function withDb(fn) {
-  const { DatabaseSync } = await import('node:sqlite');
-  const db = new DatabaseSync(DB_PATH);
-  try {
-    return fn(db);
-  } finally {
-    db.close();
-  }
-}
-
-// ── Difficulty progression based on solve streak ──
-// easy → after 3 days solved → medium → after 5 days → hard → after 7 days → expert
-const DIFFICULTY_THRESHOLDS = [
-  { difficulty: 'easy', minStreak: 0 },
-  { difficulty: 'medium', minStreak: 3 },
-  { difficulty: 'hard', minStreak: 8 },
-  { difficulty: 'expert', minStreak: 15 },
-];
-
-async function getCurrentDifficulty() {
-  try {
-    const { DatabaseSync } = await import('node:sqlite');
-    const db = new DatabaseSync('./vectors.db');
-    db.exec("CREATE TABLE IF NOT EXISTS algo_daily (key TEXT PRIMARY KEY, value TEXT, created_at TEXT)");
-
-    // Get solved history
-    const row = db.prepare("SELECT value FROM algo_daily WHERE key = 'solved_history'").get();
-    db.close();
-
-    if (!row?.value) return 'easy';
-
-    // Parse JSON array of dates
-    let history = [];
-    try { history = JSON.parse(row.value); } catch { return 'easy'; }
-    if (!history.length) return 'easy';
-
-    // Calculate consecutive solve streak (days in a row)
-    let streak = 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    for (let i = 0; i < history.length; i++) {
-      const date = new Date(history[i]);
-      date.setHours(0, 0, 0, 0);
-      const daysDiff = Math.floor((today - date) / (1000 * 60 * 60 * 24));
-      if (daysDiff === i) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-
-    // Determine difficulty based on streak
-    let currentDiff = 'easy';
-    for (const t of DIFFICULTY_THRESHOLDS) {
-      if (streak >= t.minStreak) currentDiff = t.difficulty;
-    }
-
-    console.log(`[AlgoBot] Streak: ${streak} days → Difficulty: ${currentDiff}`);
-    return currentDiff;
-  } catch (err) {
-    console.debug('[AlgoBot] getDifficulty failed, defaulting to easy:', err.message);
-    return 'easy';
-  }
 }
 
 // ── LeetCode GraphQL API ────────────────────────────────────────────────────
@@ -211,28 +133,10 @@ async function sendDailyProblem() {
     return;
   }
 
-  // ── Time window: Only send between 6AM-12PM PDT ──
-  if (!isSendingWindow()) {
-    const pdtDate = getPdtDate();
-    const now = new Date();
-    const pdt = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-    console.log(`[AlgoBot] Outside sending window (PDT: ${pdt.toLocaleTimeString()}). Skipping.`);
-    return;
-  }
-
   console.log('[AlgoBot] Fetching LeetCode problem...');
 
-  // Ensure table exists first
-  try {
-    const { DatabaseSync } = await import('node:sqlite');
-    const db = new DatabaseSync('./vectors.db');
-    db.exec("CREATE TABLE IF NOT EXISTS algo_daily (key TEXT PRIMARY KEY, value TEXT, created_at TEXT)");
-    db.close();
-  } catch { /* ignore */ }
-
-  // ── Determine difficulty based on solve streak ──
-  const targetDifficulty = await getCurrentDifficulty();
-
+  // ── Determine difficulty (default: easy, no DB dependency) ──
+  const targetDifficulty = 'easy';
   console.log(`[AlgoBot] Target difficulty: ${targetDifficulty}`);
 
   // Fetch problem theo difficulty
@@ -253,25 +157,14 @@ async function sendDailyProblem() {
   const tags = (q.topicTags || []).map(t => t.name).join(', ');
   const content = q.content?.replace(/<[^>]+>/g, '').slice(0, 1000) || 'Xem đề bài tại link bên dưới.';
   const link = `https://leetcode.com/problems/${q.titleSlug}/`;
-  const today = new Date().toISOString().slice(0, 10);
 
-  // Lưu vào DB
-  await withDb(db => {
-    db.exec("CREATE TABLE IF NOT EXISTS algo_daily (key TEXT PRIMARY KEY, value TEXT, created_at TEXT)");
-    db.prepare('INSERT OR REPLACE INTO algo_daily (key, value, created_at) VALUES ($k, $v, $t)').run({
-      $k: 'current_problem',
-      $v: JSON.stringify({ title, difficulty, tags, content, link, date: today }),
-      $t: new Date().toISOString(),
-    });
-  });
-
-  // Gửi webhook
+  // ── Gửi Webhook: Nhúng thẳng đáp án dưới dạng Spoiler ──
   const payload = {
     embeds: [{
       color: difficulty === 'Easy' ? 0x22c55e : difficulty === 'Medium' ? 0xf59e0b : 0xff0000,
       title: `🧠 Daily Algorithm — ${title}`,
-      description: `**Difficulty:** ${difficulty}\n**Tags:** ${tags}\n\n${content.slice(0, 500)}\n\n[📝 Giải bài này](${link})`,
-      footer: { text: 'Gõ !done khi đã giải xong. Đáp án sẽ gửi lúc 23:59 nếu chưa giải.' },
+      description: `**Difficulty:** ${difficulty}\n**Tags:** ${tags}\n\n${content.slice(0, 500)}\n\n[📝 Bấm vào đây để Giải](${link})\n\n💡 **Đáp án (Click để xem):** ||[Xem Solution Code trên LeetCode](${link}editorial/)||`,
+      footer: { text: 'Không cần gõ !done nữa, hãy tự giác học tập nhé!' },
       timestamp: new Date().toISOString(),
     }],
   };
@@ -279,77 +172,6 @@ async function sendDailyProblem() {
   const ok = await sendWebhook(payload);
   console.log(`[AlgoBot] Sent: ${title} (${difficulty}) — ${ok ? 'OK' : 'FAILED'}`);
   if (ok) await markSent(); // Mark as sent for catch-up
-}
-
-// ── Answer: Gửi đáp án 23:59 ────────────────────────────────────────────────
-
-async function sendAnswer() {
-  console.log('[AlgoBot] Checking if answer needed...');
-
-  const problem = await withDb(db => {
-    const row = db.prepare("SELECT value FROM algo_daily WHERE key = $key").get({ $key: 'current_problem' });
-    return row ? JSON.parse(row.value) : null;
-  });
-
-  if (!problem) {
-    console.log('[AlgoBot] No current problem.');
-    return;
-  }
-
-  const solved = await withDb(db => {
-    const row = db.prepare("SELECT value FROM algo_daily WHERE key = $key").get({ $key: 'solved' });
-    return row?.value;
-  });
-
-  const today = new Date().toISOString().slice(0, 10);
-  if (solved === today) {
-    console.log('[AlgoBot] Already solved today.');
-    return;
-  }
-
-  const payload = {
-    embeds: [{
-      color: 0x22c55e,
-      title: `💡 Đáp án: ${problem.title}`,
-      description: `**Difficulty:** ${problem.difficulty}\n**Tags:** ${problem.tags}\n\n${problem.content?.slice(0, 1000) || 'Xem solution tại LeetCode.'}\n\n[📝 Xem solution](${problem.link})`,
-      footer: { text: 'Hôm nay lại có bài mới lúc 8AM!' },
-      timestamp: new Date().toISOString(),
-    }],
-  };
-
-  const ok = await sendWebhook(payload);
-  console.log(`[AlgoBot] Sent answer: ${problem.title} — ${ok ? 'OK' : 'FAILED'}`);
-}
-
-// ── Mark solved ─────────────────────────────────────────────────────────────
-
-async function markSolved() {
-  try {
-    const { DatabaseSync } = await import('node:sqlite');
-    const db = new DatabaseSync('./vectors.db');
-    db.exec("CREATE TABLE IF NOT EXISTS algo_daily (key TEXT PRIMARY KEY, value TEXT, created_at TEXT)");
-    const today = new Date().toISOString().slice(0, 10);
-
-    // Mark solved for today
-    db.prepare("INSERT OR REPLACE INTO algo_daily (key, value, created_at) VALUES (?, ?, ?)").run('solved', today, new Date().toISOString());
-
-    // Append to solved history for streak calculation
-    const historyRow = db.prepare("SELECT value FROM algo_daily WHERE key = 'solved_history'").get();
-    let history = [];
-    if (historyRow) {
-      try { history = JSON.parse(historyRow.value); } catch { history = []; }
-    }
-    if (!history.includes(today)) {
-      history.unshift(today); // Add to front
-      history = history.slice(0, 30); // Keep last 30 days
-      db.prepare("INSERT OR REPLACE INTO algo_daily (key, value, created_at) VALUES (?, ?, ?)").run('solved_history', JSON.stringify(history), new Date().toISOString());
-    }
-
-    db.close();
-    console.log(`[AlgoBot] Marked as solved. History: ${history.length} days`);
-  } catch (err) {
-    console.error('[AlgoBot] markSolved failed:', err.message);
-  }
 }
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
@@ -360,12 +182,6 @@ switch (mode) {
   case 'daily':
     await sendDailyProblem();
     break;
-  case 'answer':
-    await sendAnswer();
-    break;
-  case 'done':
-    await markSolved();
-    break;
   default:
-    console.log('Usage: node scripts/algo_webhook.js [daily|answer|done]');
+    console.log('Usage: node cron/algo_webhook.js daily');
 }
