@@ -10,7 +10,7 @@
  */
 
 import 'dotenv/config';
-import { fetchJson, fetchText } from '../lib/smart_fetcher.js';
+import { httpGet, httpScrape, fetchText } from '../lib/http_client.js';
 
 const TECH_WEBHOOK = process.env.TECH_WEBHOOK_URL || process.env.DISCORD_WEBHOOK;
 if (!TECH_WEBHOOK) { console.error('❌ TECH_WEBHOOK_URL not set'); process.exit(1); }
@@ -65,15 +65,15 @@ function recordSentTopic(topic, urls) {
 // Uses fetchJson for APIs, fetchText for HTML/XML
 
 async function fetchHN(query, limit = 10) {
-  // HN Algolia API — JSON endpoint, dùng fetchJson với retry
-  const d = await fetchJson(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(query)}&tags=story&hitsPerPage=${limit}`);
+  // HN Algolia API — JSON endpoint, dùng httpGet với auto-retry
+  const d = await httpGet(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(query)}&tags=story&hitsPerPage=${limit}`);
   if (!d) return [];
   return (d.hits || []).map(h => ({ title: h.title || 'Untitled', url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`, pts: h.points || 0 }));
 }
 
 async function fetchReddit(query, limit = 10) {
-  // Reddit JSON API — dùng fetchJson với retry
-  const d = await fetchJson(`https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=relevance&t=week&limit=${limit}`);
+  // Reddit JSON API — dùng httpGet với auto-retry
+  const d = await httpGet(`https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=relevance&t=week&limit=${limit}`);
   if (!d || !d.data?.children) return [];
   return d.data.children
     .filter(c => c.data && !c.data.stickied)
@@ -82,8 +82,8 @@ async function fetchReddit(query, limit = 10) {
 }
 
 async function fetchGitHub(query, limit = 10) {
-  // GitHub API — JSON endpoint, dùng fetchJson với retry
-  const d = await fetchJson(
+  // GitHub API — JSON endpoint, dùng httpGet với auto-retry
+  const d = await httpGet(
     `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}+created:>2024-01-01&sort=stars&order=desc&per_page=${limit}`,
     { headers: { 'Accept': 'application/vnd.github.v3+json' } }
   );
@@ -92,7 +92,7 @@ async function fetchGitHub(query, limit = 10) {
 }
 
 async function fetchArXiv(query, limit = 5) {
-  // ArXiv API — XML endpoint, dùng fetchText với retry
+  // ArXiv API — XML endpoint, dùng fetchText với auto-retry
   const xml = await fetchText(`http://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&start=0&max_results=${limit}`);
   if (!xml) return [];
   return [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].map(m => ({

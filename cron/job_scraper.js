@@ -10,7 +10,7 @@
  */
 
 import 'dotenv/config';
-import { fetchJson, fetchText, crawlHtml } from '../lib/smart_fetcher.js';
+import { httpGet, httpPost, httpScrape } from '../lib/http_client.js';
 
 const JOB_WEBHOOK = process.env.JOB_WEBHOOK_URL || process.env.DISCORD_WEBHOOK;
 

@@ -9,7 +9,7 @@
 import 'dotenv/config';
 import fs from 'fs/promises';
 import path from 'path';
-import { fetchJson } from '../lib/smart_fetcher.js';
+import { httpGet, httpPost } from '../lib/http_client.js';
 
 const ALGO_WEBHOOK_URL = process.env.ALGO_WEBHOOK_URL || '';
 const CATCHUP_FILE = path.resolve('./.algo_catchup.json');
@@ -66,19 +66,17 @@ async function fetchLeetCodeProblemByDifficulty(difficulty) {
   const seed = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const skip = parseInt(seed) % 100;
 
-  // Dùng fetchJson với retry (POST request)
-  const data = await fetchJson('https://leetcode.com/graphql', {
-    method: 'POST',
+  // Dùng httpPost với auto-retry
+  const data = await httpPost('https://leetcode.com/graphql', {
+    query,
+    variables: {
+      categorySlug: 'all-code-essentials',
+      limit: 1,
+      skip,
+      filters: { difficulty: diffSlug },
+    },
+  }, {
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      query,
-      variables: {
-        categorySlug: 'all-code-essentials',
-        limit: 1,
-        skip,
-        filters: { difficulty: diffSlug },
-      },
-    }),
   });
 
   return data?.data?.problemsetQuestionList?.questions?.[0];
