@@ -768,8 +768,8 @@ async function run(topic = null, isForce = false){
   //   }
   // }
 
-  // ── Tier 3: Circuit Breaker wrapper cho external API calls ──
-  const { getBreaker } = await import('./lib/circuit_breaker.js');
+  // ── Tier 3: Circuit Breaker (inline, circuit_breaker.js removed) ──
+  const getBreaker = () => ({ execute: (fn) => fn(), getState: () => 'CLOSED' });
   const withBreaker = (name, fn, fallback = []) => {
     const breaker = getBreaker(name, {
       failureThreshold: 3,

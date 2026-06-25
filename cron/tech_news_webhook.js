@@ -12,7 +12,7 @@
 import 'dotenv/config';
 import { httpGet, httpScrape, fetchText } from '../lib/http_client.js';
 import { scoreContent, formatQualityBar } from '../lib/content_quality.js';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { getDb, runQuery } from '../lib/db.js';
 
 const TECH_WEBHOOK = process.env.TECH_WEBHOOK_URL;
 if (!TECH_WEBHOOK) {
@@ -29,40 +29,25 @@ const TECH_TOPICS = [
   'networking', 'open source', 'edge computing', 'IoT',
 ];
 
-// ── Dedup: file-based sent history (works on VPS + GitHub Actions) ──
-const SENT_HISTORY_PATH = './data/tech_news_sent.json';
-
-function loadSentHistory() {
-  try {
-    return JSON.parse(readFileSync(SENT_HISTORY_PATH, 'utf8'));
-  } catch { return { topics: {}, urls: {} }; }
+// ── Dedup: SQLite DB (survives restarts, unlike file-based) ──
+async function ensureDedupTable() {
+  const db = await getDb();
+  await runQuery(db, `CREATE TABLE IF NOT EXISTS sent_news (url TEXT PRIMARY KEY, sent_at TEXT DEFAULT (datetime('now')))`);
 }
 
-function saveSentHistory(history) {
-  try {
-    mkdirSync('./data', { recursive: true });
-    writeFileSync(SENT_HISTORY_PATH, JSON.stringify(history, null, 2));
-  } catch { /* ignore */ }
-}
-
-function isTopicSentToday(topic) {
-  const history = loadSentHistory();
+async function isTopicSentToday(topic) {
+  const db = await getDb();
   const today = new Date().toISOString().slice(0, 10);
-  return history.topics[topic] === today;
+  const row = await runQuery(db, 'SELECT 1 FROM sent_news WHERE url LIKE ? AND sent_at >= ?', [`topic:${topic}`, today + '%']);
+  return row && row.changes > 0;
 }
 
-function recordSentTopic(topic, urls) {
-  const history = loadSentHistory();
-  const today = new Date().toISOString().slice(0, 10);
-  history.topics[topic] = today;
+async function recordSentTopic(topic, urls) {
+  const db = await getDb();
+  await runQuery(db, 'INSERT OR IGNORE INTO sent_news (url, sent_at) VALUES (?, ?)', [`topic:${topic}`, new Date().toISOString()]);
   for (const url of urls) {
-    if (url) history.urls[url] = today;
+    if (url) await runQuery(db, 'INSERT OR IGNORE INTO sent_news (url, sent_at) VALUES (?, ?)', [url, new Date().toISOString()]);
   }
-  // Prune: chỉ giữ 7 ngày gần nhất
-  const cutoff = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-  for (const k of Object.keys(history.topics)) { if (history.topics[k] < cutoff) delete history.topics[k]; }
-  for (const k of Object.keys(history.urls)) { if (history.urls[k] < cutoff) delete history.urls[k]; }
-  saveSentHistory(history);
 }
 
 // ── Smart fetcher (retry + rate-limit + fallback) ──
@@ -113,7 +98,8 @@ function pickRandomTopic() {
 async function main() {
   const topic = process.argv[2] || pickRandomTopic();
 
-  if (isTopicSentToday(topic)) {
+  await ensureDedupTable();
+  if (await isTopicSentToday(topic)) {
     console.log(`[TechNews] Already sent "${topic}" today — skip`);
     return;
   }
@@ -139,9 +125,10 @@ async function main() {
     return true;
   });
 
-  // ── Inter-run URL dedup via sent history ──
-  const history = loadSentHistory();
-  const sentUrls = new Set(Object.keys(history.urls));
+  // ── Inter-run URL dedup via SQLite ──
+  const db = await getDb();
+  const sentRows = await runQuery(db, "SELECT url FROM sent_news WHERE sent_at >= datetime('now', '-7 days')");
+  const sentUrls = new Set(sentRows.map(r => r.url));
   if (sentUrls.size > 0) {
     const before = all.length;
     all = all.filter(n => !sentUrls.has(n.url));
@@ -187,8 +174,8 @@ async function main() {
     const res = await fetch(TECH_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ embeds: [embed] }) });
     if (res.ok) {
       console.log(`[TechNews] ✅ Sent ${all.length} items`);
-      // Record sent topic + URLs để lần sau không trùng
-      recordSentTopic(topic, all.map(n => n.url));
+      // Record sent topic + URLs vào DB để lần sau không trùng
+      await recordSentTopic(topic, all.map(n => n.url));
     } else {
       console.error('[TechNews] ❌ Failed:', res.status);
     }
