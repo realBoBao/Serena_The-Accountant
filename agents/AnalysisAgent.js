@@ -11,6 +11,8 @@
 
 import { BloomFilter } from '../lib/bloom_filter.js';
 import { scrapeUrl } from '../lib/web_scraper.js';
+import { detectExternalSource, calculateSourceScore } from '../lib/source_analyzer.js';
+import { auditCode } from '../lib/security_auditor.js';
 
 // Singleton Bloom Filter cho URL deduplication
 // Dự kiến 10M URL, false positive rate 1% → ~12MB RAM
@@ -75,16 +77,29 @@ export async function analyzeUrl(url, options = {}) {
   }
   // For github/youtube/arxiv, keep existing behavior (API-based)
 
+  // ── Source quality analysis ──
+  const sourceTag = detectExternalSource(url);
+  const sourceScore = calculateSourceScore({
+    type: urlType === 'github' ? 'repo' : urlType === 'youtube' ? 'video' : 'web',
+    isRelevant: !!content,
+  });
+
+  // ── Security audit (for code content) ──
+  const securityAudit = content ? auditCode(content) : null;
+
   const result = {
     url,
     type: urlType,
     title,
+    sourceTag,
+    sourceScore,
+    securityAudit,
     summary: content ? content.slice(0, 500) : `Analysis for ${url}`,
     content,       // Full markdown content (for RAG pipeline)
     analyzedAt: new Date().toISOString(),
   };
 
-  console.log(`[AnalysisAgent] New URL analyzed: ${url} (${urlType})${content ? ` → ${content.length} chars` : ''}`);
+  console.log(`[AnalysisAgent] New URL analyzed: ${url} (${urlType}) ${sourceTag} quality=${sourceScore.toFixed(2)}${securityAudit ? ` security=${securityAudit.riskLevel}` : ''}`);
   return result;
 }
 

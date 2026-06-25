@@ -23,6 +23,7 @@ import {
   getUserPreference,
 } from '../lib/cross_model_learner.js';
 import { normalizeDomainCategory } from '../lib/query_quality.js';
+import { scoreConfidence } from '../lib/confidence_scorer.js';
 // Lazy imports for optional features (loaded on demand to reduce startup memory)
 
 // ── Fallback: Lấy random sources từ database khi LLM hỏng ──
