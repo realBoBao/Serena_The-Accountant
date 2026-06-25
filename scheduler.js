@@ -575,7 +575,7 @@ if (!IS_CLOUD_RUN) {
     }
   }, { timezone: 'America/Los_Angeles' });
 
-  // ── Tier 3: Job Scraper — 6:00 AM + 12PM + 6PM PDT ──
+  // ── Tier 3: Job Scraper — 6:00 AM, 1:00 PM, 7:00 PM PDT ──
   const JOB_CRON = '0 6,13,19 * * *';
   jobTask = cron.schedule(JOB_CRON, async () => {
     logger.info('[Scheduler] Job scraper triggered');
