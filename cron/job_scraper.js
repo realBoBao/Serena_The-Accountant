@@ -11,6 +11,7 @@
 
 import 'dotenv/config';
 import { httpGet, httpPost, httpScrape } from '../lib/http_client.js';
+import { getDb, runQuery } from '../lib/db.js';
 
 const JOB_WEBHOOK = process.env.JOB_WEBHOOK_URL || process.env.DISCORD_WEBHOOK;
 
@@ -357,45 +358,47 @@ async function main() {
     console.log(`[JobScraper] Filtered: ${rawJobs.length} → ${filteredJobs.length} (removed ${rawJobs.length - filteredJobs.length} irrelevant)`);
   }
 
-  // ── Dedup: Chống gửi trùng bằng cách đọc Lịch sử Discord (Cloud-safe) ──
-  console.log(`[JobScraper] Đang kiểm tra lịch sử Discord để lọc trùng...`);
-  const sentUrls = new Set();
-  try {
-    const webhookMatch = JOB_WEBHOOK.match(/webhooks\/(\d+)\//);
-    if (webhookMatch) {
-      const channelId = webhookMatch[1];
-      const histRes = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages?limit=100`, {
-        headers: { 'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}` },
-      });
-      if (histRes.ok) {
-        const messages = await histRes.json();
-        messages.forEach(msg => {
-          (msg.embeds || []).forEach(embed => {
-            const desc = embed.description || '';
-            // Rút trích tất cả URL trong markdown [Apply](url)
-            const links = [...desc.matchAll(/\[Apply\]\((https?:\/\/[^\)]+)\)/g)];
-            links.forEach(match => sentUrls.add(match[1]));
-          });
-        });
-      }
+  // ── Dedup: Dùng SQLite DB để lọc trùng (không phụ thuộc Discord API) ──
+  console.log(`[JobScraper] Kiểm tra SQLite DB để lọc trùng...`);
+  const db = await getDb();
+  
+  // Tạo bảng sent_jobs nếu chưa có
+  await runQuery(db, `
+    CREATE TABLE IF NOT EXISTS sent_jobs (
+      url TEXT PRIMARY KEY,
+      sent_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // Query tất cả URL đã gửi trong 7 ngày qua
+  const sentRows = await runQuery(db, 
+    "SELECT url FROM sent_jobs WHERE sent_at >= datetime('now', '-7 days')"
+  );
+  const sentUrls = new Set(sentRows.map(r => r.url));
+  console.log(`[JobScraper] DB dedup: ${sentUrls.size} URLs đã gửi trong 7 ngày qua`);
+
+  // Lọc ra những job chưa từng gửi
+  const skipped = [];
+  const dedupedJobs = filteredJobs.filter(j => {
+    const url = j.link || '';
+    if (sentUrls.has(url)) {
+      skipped.push(j.company);
+      return false;
     }
-  } catch (err) {
-    console.warn('[JobScraper] Lỗi đọc Discord History:', err.message);
-  }
+    return true;
+  });
 
-  // Lọc ra những job chưa từng xuất hiện trong 100 tin nhắn gần nhất
-  const dedupedJobs = filteredJobs.filter(j => !sentUrls.has(j.link || ''));
-
-  if (dedupedJobs.length < filteredJobs.length) {
-    console.log(`[JobScraper] Dedup: ${filteredJobs.length} → ${dedupedJobs.length} (removed already sent)`);
+  if (skipped.length > 0) {
+    console.log(`[JobScraper] SKIP ${skipped.length} đã gửi: ${skipped.slice(0, 5).join(', ')}${skipped.length > 5 ? '...' : ''}`);
   }
+  console.log(`[JobScraper] Dedup: ${filteredJobs.length} → ${dedupedJobs.length} (removed ${skipped.length} trùng)`);
 
   if (dedupedJobs.length === 0) {
-    console.log('[JobScraper] No new jobs after filter + dedup.');
+    console.log('[JobScraper] ✅ 0 job mới. Dedup hoạt động bình thường, không spam.');
     return;
   }
 
-  console.log(`[JobScraper] Sending ${dedupedJobs.length} relevant jobs`);
+  console.log(`[JobScraper] Gửi ${dedupedJobs.length} job mới...`);
 
   // Build Discord embed
   const jobsByType = {};
@@ -433,6 +436,13 @@ async function main() {
 
     if (res.ok) {
       console.log('[JobScraper] ✅ Webhook sent successfully');
+      // Lưu URL đã gửi vào DB
+      for (const j of dedupedJobs) {
+        try {
+          await runQuery(db, 'INSERT OR IGNORE INTO sent_jobs (url) VALUES (?)', [j.link || '']);
+        } catch { /* ignore dup */ }
+      }
+      console.log(`[JobScraper] ✅ Đã lưu ${dedupedJobs.length} URLs vào DB`);
     } else {
       console.error('[JobScraper] ❌ Webhook failed:', res.status, await res.text());
     }
