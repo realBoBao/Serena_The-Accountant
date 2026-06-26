@@ -36,10 +36,9 @@ async function ensureDedupTable() {
 }
 
 async function isTopicSentToday(topic) {
-  const db = await getDb();
-  const today = new Date().toISOString().slice(0, 10);
-  const row = await runQuery(db, 'SELECT 1 FROM sent_news WHERE url LIKE ? AND sent_at >= ?', [`topic:${topic}`, today + '%']);
-  return row && row.changes > 0;
+  // Bỏ topic dedup — luôn gửi topic mới mỗi lần trigger
+  // Chỉ dedup theo URL (tránh gửi cùng 1 link)
+  return false;
 }
 
 async function recordSentTopic(topic, urls) {
