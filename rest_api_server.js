@@ -769,15 +769,9 @@ route('POST', '/api/audit/vibe', async (req, res) => {
   }
 }, { public: true });
 
-// ── Data Federation Stats (Tier 4) ──
+// ── Data Federation Stats (Tier 4) — data_federation.js removed ──
 route('GET', '/api/data/stats', async (req, res) => {
-  try {
-    const { getTierStats } = await import('./lib/data_federation.js');
-    const stats = await getTierStats();
-    json(res, { ok: true, ...stats });
-  } catch (err) {
-    json(res, { error: err.message }, 500);
-  }
+  json(res, { ok: false, error: 'Data federation module not available' }, 501);
 }, { public: true });
 
 // ── Outbox Stats (Tier 3) ──
