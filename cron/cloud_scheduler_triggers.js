@@ -9,32 +9,17 @@
  *   Cloud Scheduler (cron trên mây) → bắt request → Cloud Run thức dậy
  *   → xử lí job → trả 200 → ngủ đông
  *
- *   Thay thế hoàn toàn scheduler.js (node-cron chạy 24/7 trong process).
- *   Không tốn CPU khi không có job.
- *
- * CÀI ĐẶT (gcloud CLI):
- *   gcloud scheduler jobs create http memory-consolidation \
- *     --schedule="0 2 * * *" \
- *     --uri=https://YOUR-RUN-URL/scheduler/memory \
- *     --http-method=POST \
- *     --oidc-service-account-email=YOUR-SA@project.iam.gserviceaccount.com
- *
- *   gcloud scheduler jobs create http weekly-backup \
- *     --schedule="0 3 * * 0" \
- *     --uri=https://YOUR-RUN-URL/scheduler/backup \
- *     --http-method=POST \
- *     --oidc-service-account-email=YOUR-SA@project.iam.gserviceaccount.com
- *
- *   gcloud scheduler jobs create http evolution-eval \
- *     --schedule="0 4 * * 1" \
- *     --uri=https://YOUR-RUN-URL/scheduler/evolution \
- *     --http-method=POST \
- *     --oidc-service-account-email=YOUR-SA@project.iam.gserviceaccount.com
+ * Thay thế hoàn toàn scheduler.js (node-cron chạy 24/7 trong process).
+ * Không tốn CPU khi không có job.
  *
  * @module cloud_scheduler_triggers
  */
 
 import 'dotenv/config';
+import { main as runTechNews } from './tech_news_webhook.js';
+import { main as runAlgoWebhook } from './algo_webhook.js';
+import { runJobScraper } from './job_scraper.js';
+import { runNightlyScraper } from './nightly_scraper.js';
 
 // ═══════════════════════════════════════════════════════════
 //  JOB HANDLERS
@@ -61,8 +46,8 @@ export async function handleJob(jobName) {
     console.log(`[CloudScheduler] Job ${jobName} completed in ${duration}ms`);
     return { ok: true, duration, ...result };
   } catch (err) {
-    console.error(`[CloudScheduler] Job ${jobName} failed:`, err.message);
-    return { ok: false, error: err.message, duration: Date.now() - startTime };
+    console.error(`[CloudScheduler] Job ${jobName} failed:`, err?.message || err);
+    return { ok: false, error: err?.message || String(err), duration: Date.now() - startTime };
   }
 }
 
@@ -72,7 +57,6 @@ export async function handleJob(jobName) {
 
 /**
  * Memory Consolidation — Chạy 2:00 AM mỗi ngày
- * Tóm tắt memories 7 ngày qua → nhúng vector → lưu long-term
  */
 registerJob('memory', async () => {
   const { archiveOldMemories, getRecentMemory } = await import('./lib/memory_manager.js');
@@ -100,56 +84,59 @@ registerJob('memory', async () => {
     }
   }
 
-  const results = {};
   const processItems = async (items, upsertFn, name) => {
     if (items.length === 0) return;
+
     const combinedText = items.map(i => i.content).join('\n').slice(0, 4000);
     const docId = `${name}:${new Date().toISOString().slice(0, 10)}`;
-    try {
-      const embedding = await embedText(combinedText);
-      if (!embedding?.length) {
-        results[name] = { skipped: true, reason: 'embedding failed' };
-        return;
-      }
-      await upsertFn(docId, {
+
+    const embedding = await embedText(combinedText);
+    if (!embedding?.length) {
+      return { skipped: true, reason: 'embedding failed', name };
+    }
+
+    await upsertFn(
+      docId,
+      {
         url: 'scheduler://consolidation',
         project: name,
         category: 'Memory',
         type: 'consolidated',
-      }, [combinedText], [embedding]);
-      results[name] = { items: items.length };
-    } catch (err) {
-      results[name] = { error: err.message };
-    }
+      },
+      [combinedText],
+      [embedding]
+    );
+
+    return { saved: true, items: items.length, name };
   };
 
-  await processItems(academicItems, upsertAcademic, 'academic');
-  await processItems(systemItems, upsertSystem, 'system');
-  await processItems(dailyItems, upsertDaily, 'daily');
+  const results = await Promise.allSettled([
+    processItems(academicItems, upsertAcademic, 'academic'),
+    processItems(systemItems, upsertSystem, 'system'),
+    processItems(dailyItems, upsertDaily, 'daily'),
+  ]);
 
-  return { message: `Consolidated ${recentMemories.length} memories`, details: results };
+  for (const r of results) {
+    if (r.status === 'rejected') {
+      console.error('[CloudScheduler] memory collection failed:', r.reason?.message || r.reason);
+    }
+  }
+
+  await archiveOldMemories(30);
+  return { message: `Consolidated ${recentMemories.length} memories` };
 });
 
 /**
  * Weekly Backup — Chạy 3:00 AM Chủ Nhật
- * Backup DB files (adapt for Cloud Storage in production)
  */
 registerJob('backup', async () => {
-  // In production: upload to GCS bucket
-  // For now, delegate to local backup script
   const { execSync } = await import('child_process');
-  try {
-    const result = execSync('node scripts/backup_db.js', { encoding: 'utf8', timeout: 60000 });
-    return { message: 'Backup completed', output: result.slice(0, 500) };
-  } catch (err) {
-    // If script doesn't exist, just log
-    return { message: 'Backup script not available (expected in local dev only)' };
-  }
+  const result = execSync('node scripts/backup_db.js', { encoding: 'utf8', timeout: 60000 });
+  return { message: 'Backup completed', output: result.slice(0, 500) };
 });
 
 /**
- * Evolution Evaluation — Chạy 4:00 AM thứ 2 hàng tuần
- * Chạy self-evaluation pipeline
+ * Evolution Evaluation — Chạy 4:00 AM mỗi ngày/tuần theo scheduler.js (hiện port: 4:00 AM thứ 2)
  */
 registerJob('evolution', async () => {
   const { getEvaluationStats, getModelPerformanceReport, detectKnowledgeGaps } = await import('./lib/self_evolution.js');
@@ -168,28 +155,40 @@ registerJob('evolution', async () => {
 
 /**
  * Pipeline Report — Chạy theo lịch từ scheduler.js
- * Tạo báo cáo pipeline
  */
 registerJob('pipeline', async () => {
   const { addJob, JobType, QueueName } = await import('./lib/task_queue.js');
-  try {
-    await addJob(QueueName.PRIORITY, JobType.RUN_PIPELINE, {
-      topic: process.env.PIPELINE_TOPIC || 'beginner',
-      force: false,
-    });
-    return { message: 'Pipeline job queued' };
-  } catch (err) {
-    // task_queue might not be available in Cloud Run (no Redis)
-    return { message: 'Pipeline queued locally', note: 'BullMQ not available, would need Cloud Tasks' };
-  }
+  await addJob(QueueName.PRIORITY, JobType.RUN_PIPELINE, {
+    topic: process.env.PIPELINE_TOPIC || 'beginner',
+    force: false,
+  });
+  return { message: 'Pipeline job queued' };
 });
 
 /**
  * Graph Sync — Đồng bộ knowledge graph
  */
 registerJob('graph', async () => {
-  // Placeholder: sync knowledge graph from vector store
   const { getGraphStats } = await import('./lib/knowledge_graph.js');
   const stats = await getGraphStats();
   return { message: 'Graph sync completed', stats };
 });
+
+// ────────────────────────────────────────────────────────────────
+// Tech News — Port từ scheduler.js (job “techNews”)
+// ────────────────────────────────────────────────────────────────
+registerJob('techNews', async () => {
+  const { runTechNews } = await import('./cron/tech_news_webhook.js');
+  const result = await runTechNews();
+  return { message: 'Tech news completed', result };
+});
+
+// ────────────────────────────────────────────────────────────────
+// Algo Webhook — Port từ scheduler.js (job “algo”)
+// ────────────────────────────────────────────────────────────────
+registerJob('algo', async () => {
+  const { runAlgoWebhook } = await import('./cron/algo_webhook.js');
+  const result = await runAlgoWebhook();
+  return { message: 'Algo webhook completed', result };
+});
+
