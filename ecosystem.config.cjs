@@ -1,11 +1,14 @@
 /**
- * PM2 Ecosystem — AI Brain v7 (Simplified)
+ * PM2 Ecosystem — AI Brain v8 (Optimized for 2GB RAM)
  *
- * Chỉ chạy AI_Brain (gateway.js) — gateway tự quản lý 4 services bên trong.
- * KHÔNG spawn scheduler riêng — tránh trùng lặp.
+ * Chỉ chạy 2 services:
+ *   AI_Brain       — Gateway (discord + restApi + scheduler + watcher)
+ *   AI_WebhookBot  — Cron push tech/news/job/algo webhooks
+ *
+ * KHÔNG spawn AI_Scheduler (gateway đã có scheduler)
+ * KHÔNG spawn AI_AgentWorker (RouterAgent chạy trong gateway)
  *
  * ⚠️ SECURITY: All API keys are loaded from .env file via dotenv.
- *    NEVER hardcode keys in this file.
  */
 module.exports = {
   apps: [
@@ -15,8 +18,8 @@ module.exports = {
       instances: 1,
       exec_mode: "fork",
       watch: false,
-      max_memory_restart: "600M",
-      node_args: "--max-old-space-size=512",
+      max_memory_restart: "700M",
+      node_args: "--max-old-space-size=600",
       env: {
         NODE_ENV: "production",
         DISCORD_COMMAND_PREFIX: "!ask ",
@@ -26,6 +29,19 @@ module.exports = {
         REDIS_PORT: "6379",
         ...(process.env.GOOGLE_API_KEY ? { GOOGLE_API_KEY: process.env.GOOGLE_API_KEY } : {}),
         ...(process.env.GEMINI_API_KEY ? { GEMINI_API_KEY: process.env.GEMINI_API_KEY } : {}),
+      },
+    },
+    {
+      name: "AI_WebhookBot",
+      script: "./webhook_bot.js",
+      instances: 1,
+      exec_mode: "fork",
+      watch: false,
+      max_memory_restart: "150M",
+      node_args: "--max-old-space-size=128",
+      env: {
+        NODE_ENV: "production",
+        WEBHOOK_BOT_PORT: "3007",
       },
     },
   ],
