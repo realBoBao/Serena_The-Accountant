@@ -11,6 +11,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { httpGet, httpPost } from '../lib/http_client.js';
 import { scoreContent, formatQualityBar } from '../lib/content_quality.js';
+import { fetchCodeforces, fetchHackerearth, fetchKontests } from '../lib/free_apis.js';
 
 const ALGO_WEBHOOK_URL = process.env.ALGO_WEBHOOK_URL;
 if (!ALGO_WEBHOOK_URL) {
@@ -136,48 +137,72 @@ async function sendDailyProblem() {
     return;
   }
 
-  console.log('[AlgoBot] Fetching LeetCode problem...');
+  console.log('[AlgoBot] Fetching algorithm problems...');
 
-  // ── Determine difficulty (default: easy, no DB dependency) ──
-  const targetDifficulty = 'easy';
-  console.log(`[AlgoBot] Target difficulty: ${targetDifficulty}`);
+  // ── Fetch from all sources in parallel ──
+  const [leetcode, cf, he, kontests] = await Promise.all([
+    fetchLeetCodeProblemByDifficulty('easy').catch(async () => {
+      const ql = await fetchLeetCodeProblem();
+      return ql?.question || null;
+    }),
+    fetchCodeforces(5).catch(() => []),
+    fetchHackerearth(5).catch(() => []),
+    fetchKontests(5).catch(() => []),
+  ]);
 
-  // Fetch problem theo difficulty
-  let q = await fetchLeetCodeProblemByDifficulty(targetDifficulty);
-  if (!q) {
-    console.warn('[AlgoBot] Fallback to daily challenge');
-    const ql = await fetchLeetCodeProblem();
-    q = ql?.question;
-  }
-
-  if (!q) {
-    console.error('[AlgoBot] Failed to fetch any problem');
+  // ── Build main problem (LeetCode) ──
+  if (!leetcode) {
+    console.error('[AlgoBot] Failed to fetch LeetCode problem');
     return;
   }
 
-  const title = q.title;
-  const difficulty = q.difficulty;
-  const tags = (q.topicTags || []).map(t => t.name).join(', ');
-  const content = q.content?.replace(/<[^>]+>/g, '').slice(0, 1000) || 'Xem đề bài tại link bên dưới.';
-  const link = `https://leetcode.com/problems/${q.titleSlug}/`;
+  const title = leetcode.title;
+  const difficulty = leetcode.difficulty;
+  const tags = (leetcode.topicTags || []).map(t => t.name).join(', ');
+  const content = leetcode.content?.replace(/<[^>]+>/g, '').slice(0, 1000) || 'Xem đề bài tại link bên dưới.';
+  const link = `https://leetcode.com/problems/${leetcode.titleSlug}/`;
 
   // ── Quality score ──
   const quality = scoreContent({ title, url: link, source: 'LeetCode', description: content });
   console.log(`[AlgoBot] Quality: ${quality.score} (${quality.level}) ${quality.tag}`);
+
+  // ── Build bonus problems from free sources ──
+  const bonusProblems = [
+    ...cf.map(p => ({ ...p, src: 'Codeforces' })),
+    ...he.map(p => ({ ...p, src: 'Hackerearth' })),
+    ...kontests.map(p => ({ ...p, src: 'KONTESTS' })),
+  ];
+
+  // Score and sort bonus problems
+  for (const p of bonusProblems) {
+    p.quality = scoreContent({ title: p.title, url: p.url, source: p.src });
+  }
+  bonusProblems.sort((a, b) => b.quality.score - a.quality.score);
+
+  const topBonus = bonusProblems.slice(0, 3);
+
+  // ── Build bonus section ──
+  let bonusText = '';
+  if (topBonus.length > 0) {
+    bonusText = '\n\n🎯 **Bonus Challenges:**\n';
+    for (const p of topBonus) {
+      bonusText += `• [${p.title}](${p.url}) (${p.src}) ${p.quality.tag}\n`;
+    }
+  }
 
   // ── Gửi Webhook: Nhúng thẳng đáp án dưới dạng Spoiler ──
   const payload = {
     embeds: [{
       color: difficulty === 'Easy' ? 0x22c55e : difficulty === 'Medium' ? 0xf59e0b : 0xff0000,
       title: `🧠 Daily Algorithm — ${title}`,
-      description: `**Difficulty:** ${difficulty}\n**Tags:** ${tags}\n📊 **Quality:** ${quality.tag} ${formatQualityBar(quality.score)}\n\n${content.slice(0, 500)}\n\n[📝 Bấm vào đây để Giải](${link})\n\n💡 **Đáp án (Click để xem):** ||[Xem Solution Code trên LeetCode](${link}editorial/)||`,
-      footer: { text: 'Không cần gõ !done nữa, hãy tự giác học tập nhé!' },
+      description: `**Difficulty:** ${difficulty}\n**Tags:** ${tags}\n📊 **Quality:** ${quality.tag} ${formatQualityBar(quality.score)}\n\n${content.slice(0, 500)}\n\n[📝 Bấm vào đây để Giải](${link})\n\n💡 **Đáp án (Click để xem):** ||[Xem Solution Code trên LeetCode](${link}editorial/)||${bonusText}`,
+      footer: { text: `Không cần gõ !done nữa, hãy tự giác học tập nhé! | Sources: LeetCode + ${topBonus.length} bonus` },
       timestamp: new Date().toISOString(),
     }],
   };
 
   const ok = await sendWebhook(payload);
-  console.log(`[AlgoBot] Sent: ${title} (${difficulty}) — ${ok ? 'OK' : 'FAILED'}`);
+  console.log(`[AlgoBot] Sent: ${title} (${difficulty}) + ${topBonus.length} bonus — ${ok ? 'OK' : 'FAILED'}`);
   if (ok) await markSent(); // Mark as sent for catch-up
 }
 

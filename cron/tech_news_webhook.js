@@ -13,6 +13,7 @@ import 'dotenv/config';
 import { httpGet, httpScrape, fetchText } from '../lib/http_client.js';
 import { scoreContent, formatQualityBar } from '../lib/content_quality.js';
 import { runQuery, getOne, getAll } from '../lib/db.js';
+import { fetchDevTo, fetchHNTopStories } from '../lib/free_apis.js';
 import { searchTechDomains } from '../lib/domain_search.js';
 
 const TECH_WEBHOOK = process.env.TECH_WEBHOOK_URL;
@@ -104,9 +105,11 @@ async function main() {
 
   console.log(`[TechNews] Fetching: "${topic}"`);
 
-  const [hn, reddit, github, arxiv, domainSearch] = await Promise.all([
+  const [hn, reddit, github, arxiv, domainSearch, devto, hnTop] = await Promise.all([
     fetchHN(topic, 10), fetchReddit(topic, 10), fetchGitHub(topic, 10), fetchArXiv(topic, 5),
     searchTechDomains(topic, 10).catch(() => []),
+    fetchDevTo(8).catch(() => []),
+    fetchHNTopStories(8).catch(() => []),
   ]);
 
   let all = [
@@ -115,6 +118,8 @@ async function main() {
     ...github.map(n => ({ ...n, src: 'GitHub', score: Math.min(1, n.pts / 1000) })),
     ...arxiv.map(n => ({ ...n, src: 'arXiv', score: 0.75 })),
     ...domainSearch.map(n => ({ ...n, src: n.src || 'DDG', score: n.score || 0.7 })),
+    ...devto.map(n => ({ ...n, src: 'Dev.to', score: 0.8 })),
+    ...hnTop.map(n => ({ ...n, src: 'HN-Top', score: Math.min(1, n.pts / 300) })),
   ];
 
   // ── Intra-run URL dedup (same URL from multiple sources) ──
