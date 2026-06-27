@@ -341,7 +341,8 @@ async function main() {
 
   // Use PDT date for consistency
   const pdtDate = new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' });
-  const avgQuality = (dedupedJobs.reduce((s, j) => s + (j.quality?.score || 0), 0) / dedupedJobs.length * 100).toFixed(0);
+  const totalScore = dedupedJobs.reduce((s, j) => s + (j.quality?.score || 0), 0);
+  const avgQuality = dedupedJobs.length > 0 ? (totalScore / dedupedJobs.length * 100).toFixed(0) : '0';
   const embed = {
     title: `💼 Job Alerts — ${pdtDate}`,
     description: [
@@ -379,4 +380,5 @@ async function main() {
 
 main().catch(err => {
   console.error('[JobScraper] Fatal:', err.message);
+  console.error('[JobScraper] Stack:', err.stack);
 });
