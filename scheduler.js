@@ -25,7 +25,7 @@ const TOPIC_OVERRIDE = process.env.PIPELINE_TOPIC || '';
 if (IS_CLOUD_RUN) {
   logger.info('[Scheduler] Running on Cloud Run — node-cron disabled, using Cloud Scheduler');
 } else {
-  logger.info('[Scheduler] Running on local/server — using node-cron with PDT timezone');
+  logger.info('[Scheduler] Running on local/server — using node-cron with UTC timezone');
 }
 
 // ── Global cron task references (for gracefulShutdown) ──
@@ -438,26 +438,26 @@ if (!IS_CLOUD_RUN) {
     logger.info('[scheduler] Cron triggered');
     runPipeline();
   }, {
-    timezone: 'America/Los_Angeles',
+    timezone: 'Etc/UTC',
   });
 
   // Memory consolidation: 2:00 AM mỗi ngày
   memoryTask = cron.schedule(MEMORY_CRON, () => {
     logger.info('[scheduler] Memory consolidation triggered');
     runMemoryConsolidation();
-  }, { timezone: 'America/Los_Angeles' });
+  }, { timezone: 'Etc/UTC' });
 
   // Disaster Recovery: 3:00 AM Chủ Nhật hàng tuần
   backupTask = cron.schedule(BACKUP_CRON, () => {
     logger.info('[scheduler] Backup triggered');
     runBackup();
-  }, { timezone: 'America/Los_Angeles' });
+  }, { timezone: 'Etc/UTC' });
 
   // ── Hot/Cold Data Federation (Tier 4): 4:00 AM Chủ Nhật ──
   const archiveTask = cron.schedule(ARCHIVE_CRON, () => {
     logger.info('[scheduler] Archive old data triggered');
     import('./lib/data_federation.js').then(m => m.archiveOldData()).catch(() => {});
-  }, { timezone: 'America/Los_Angeles' });
+  }, { timezone: 'Etc/UTC' });
 
   // ── EvoAgent: 4:00 AM mỗi ngày — Phân tích logs & tối ưu hệ thống ──
   const EVO_CRON = '0 4 * * *';
@@ -497,7 +497,7 @@ if (!IS_CLOUD_RUN) {
     } catch (err) {
       logger.error('[scheduler] EvoAgent error:', err?.message || err);
     }
-  }, { timezone: 'America/Los_Angeles' });
+  }, { timezone: 'Etc/UTC' });
 
   // ── Memory Decay: 4:30 AM mỗi ngày — Ebbinghaus forgetting curve ──
   const DECAY_CRON = '30 4 * * *';
@@ -511,7 +511,7 @@ if (!IS_CLOUD_RUN) {
     } catch (err) {
       logger.error('[scheduler] Memory decay error:', err?.message || err);
     }
-  }, { timezone: 'America/Los_Angeles' });
+  }, { timezone: 'Etc/UTC' });
 
   // ── GraphAgent: 5:00 AM Chủ Nhật — Đồng bộ Knowledge Graph ──
   const GRAPH_CRON = '0 5 * * 0';
@@ -524,10 +524,10 @@ if (!IS_CLOUD_RUN) {
     } catch (err) {
       logger.error('[scheduler] GraphAgent error:', err?.message || err);
     }
-  }, { timezone: 'America/Los_Angeles' });
+  }, { timezone: 'Etc/UTC' });
 
-  // ── Proactive Suggestion: 8:00 AM mỗi ngày ──
-  const SUGGESTION_CRON = '0 8 * * *';
+  // ── Proactive Suggestion: 8:00 AM PDT = 15:00 UTC ──
+  const SUGGESTION_CRON = '0 15 * * *';
   suggestionTask = cron.schedule(SUGGESTION_CRON, async () => {
     logger.info('[scheduler] Proactive suggestion triggered');
     try {
@@ -559,10 +559,10 @@ if (!IS_CLOUD_RUN) {
     } catch (err) {
       logger.error('[scheduler] Suggestion error:', err?.message || err);
     }
-  }, { timezone: 'America/Los_Angeles' });
+  }, { timezone: 'Etc/UTC' });
 
-  // ── Tier 2: Daily RSS Fetch — 6:00 AM PDT ──
-  const RSS_CRON = '0 6 * * *';
+  // ── Tier 2: Daily RSS Fetch — 6:00 AM PDT = 13:00 UTC ──
+  const RSS_CRON = '0 13 * * *';
   rssTask = cron.schedule(RSS_CRON, async () => {
     logger.info('[scheduler] Daily RSS fetch triggered');
     try {
@@ -573,10 +573,10 @@ if (!IS_CLOUD_RUN) {
     } catch (err) {
       logger.error('[scheduler] Daily RSS fetch error:', err?.message || err);
     }
-  }, { timezone: 'America/Los_Angeles' });
+  }, { timezone: 'Etc/UTC' });
 
-  // ── Tier 3: Job Scraper — 6:00 AM, 1:00 PM, 7:00 PM PDT ──
-  const JOB_CRON = '0 6,13,19 * * *';
+  // ── Tier 3: Job Scraper — 6AM/1PM/7PM PDT = 13:00/20:00/02:00 UTC ──
+  const JOB_CRON = '0 13,20,2 * * *';
   jobTask = cron.schedule(JOB_CRON, async () => {
     logger.info('[Scheduler] Job scraper triggered');
     try {
@@ -587,12 +587,13 @@ if (!IS_CLOUD_RUN) {
     } catch (err) {
       logger.error('[Scheduler] Job scraper error:', err?.message || err);
     }
-  }, { timezone: 'America/Los_Angeles' });
+  }, { timezone: 'Etc/UTC' });
 
-  // ── Tech News Webhook — 8AM, 11AM, 2PM, 5PM, 8PM PDT ──
-  const TECH_NEWS_CRON = '0 8,11,14,17,20 * * *';
+  // ── Tech News Webhook — 8AM/11AM/2PM/5PM/8PM PDT = 15:00/18:00/21:00/00:00/03:00 UTC ──
+  const TECH_NEWS_CRON = '0 15,18,21,0,3 * * *';
   const techNewsTask = cron.schedule(TECH_NEWS_CRON, async () => {
-    logger.info('[Scheduler] Tech news triggered');
+    const now = new Date();
+    logger.info(`[Scheduler] Tech news triggered at ${now.toISOString()} (${now.toLocaleString('en-US', { timezone: 'Etc/UTC' })} PDT)`);
     try {
       const { runTechNews } = await import('./cron/tech_news_webhook.js');
       const result = await runTechNews();
@@ -601,10 +602,10 @@ if (!IS_CLOUD_RUN) {
     } catch (err) {
       logger.error('[Scheduler] Tech news error:', err?.message || err);
     }
-  }, { timezone: 'America/Los_Angeles' });
+  }, { timezone: 'Etc/UTC' });
 
-  // ── Algo Webhook — 8:00 AM PDT ──
-  const ALGO_CRON = '0 8 * * *';
+  // ── Algo Webhook — 8:00 AM PDT = 15:00 UTC ──
+  const ALGO_CRON = '0 15 * * *';
   algoTask = cron.schedule(ALGO_CRON, async () => {
     logger.info('[Scheduler] Algo webhook triggered');
     try {
@@ -615,7 +616,7 @@ if (!IS_CLOUD_RUN) {
     } catch (err) {
       logger.error('[Scheduler] Algo webhook error:', err?.message || err);
     }
-  }, { timezone: 'America/Los_Angeles' });
+  }, { timezone: 'Etc/UTC' });
 
   // ── Start all cron jobs ──
   task.start();
@@ -648,7 +649,7 @@ if (!IS_CLOUD_RUN) {
     } catch (err) {
       logger.error('[Scheduler] Health check error:', err?.message || err);
     }
-  }, { timezone: 'America/Los_Angeles' });
+  }, { timezone: 'Etc/UTC' });
   healthTask.start();
 
   logger.info('[Scheduler] All node-cron jobs started');
