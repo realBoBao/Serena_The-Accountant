@@ -2638,7 +2638,22 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
-    // ── !recap command: Generate learning recap ──\n    if (message.content.startsWith('!recap ')) {\n      const topic = message.content.slice(7).trim();\n      if (!topic) {\n        return message.reply({ content: '📋 Dùng: !recap <topic> — Tạo tóm tắt bài học', allowedMentions: { parse: [], repliedUser: false } });\n      }\n      const waitingMsg = await message.reply({ content: 📚 Đang tạo recap cho ****..., allowedMentions: { parse: [], repliedUser: false } });\n      try {\n        const { RecapAgent } = await import('./agents/RecapAgent.js');\n        const recap = await RecapAgent.summarizeTopic(topic);\n        await waitingMsg.edit({ content: recap, allowedMentions: { parse: [] } });\n      } catch (err) {\n        await waitingMsg.edit({ content: ❌ Lỗi recap: , allowedMentions: { parse: [] } });\n      }\n      return;\n    }\n\n    // Parse query + flags (--deep, --source=xxx)
+    // ── !recap command: Generate learning recap ──
+    if (message.content.startsWith('!recap ')) {
+      const topic = message.content.slice(7).trim();
+      if (!topic) {
+        return message.reply({ content: '📋 Dùng: `!recap <topic>` — Tạo tóm tắt bài học', allowedMentions: { parse: [], repliedUser: false } });
+      }
+      const waitingMsg = await message.reply({ content: `📚 Đang tạo recap cho **${topic}**...`, allowedMentions: { parse: [], repliedUser: false } });
+      try {
+        const { RecapAgent } = await import('./agents/RecapAgent.js');
+        const recap = await RecapAgent.summarizeTopic(topic);
+        await waitingMsg.edit({ content: truncateForDiscord(recap), allowedMentions: { parse: [] } });
+      } catch (err) {
+        await waitingMsg.edit({ content: `❌ Lỗi recap: ${err?.message || err}`, allowedMentions: { parse: [] } });
+      }
+      return;
+    }\n\n    // Parse query + flags (--deep, --source=xxx)
     const rawInput = message.content.slice(prefix.length).trim();
     if (!rawInput) {
       return message.reply({
